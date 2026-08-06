@@ -1,6 +1,6 @@
 ﻿# ==============================================================================
 # Dynamic Portfolio & Sentiment Chart Image Generator for Soul Company
-# Generates dark-theme portfolio_chart.png with smooth graphics & crisp text
+# Generates dark-theme portfolio_chart.png without emoji box glitches
 # ==============================================================================
 
 param(
@@ -29,18 +29,18 @@ $accentPurple = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::Fr
 # Background
 $g.FillRectangle($bgBrush, 0, 0, $width, $height)
 
-# Draw Title Banner
-$titleFont = New-Object System.Drawing.Font("Malgun Gothic", 18, [System.Drawing.FontStyle]::Bold)
+# Draw Title Banner (No emoji to prevent box glyphs)
+$titleFont = New-Object System.Drawing.Font("Malgun Gothic", 17, [System.Drawing.FontStyle]::Bold)
 $subFont = New-Object System.Drawing.Font("Malgun Gothic", 10, [System.Drawing.FontStyle]::Regular)
 $labelFont = New-Object System.Drawing.Font("Malgun Gothic", 11, [System.Drawing.FontStyle]::Bold)
-$valFont = New-Object System.Drawing.Font("Malgun Gothic", 11, [System.Drawing.FontStyle]::Regular)
+$valFont = New-Object System.Drawing.Font("Malgun Gothic", 10, [System.Drawing.FontStyle]::Regular)
 
-$g.DrawString("🏛️ SOUL COMPANY RESEARCH PORTFOLIO", $titleFont, $textMainBrush, 30, 25)
+$g.DrawString("SOUL COMPANY RESEARCH PORTFOLIO", $titleFont, $textMainBrush, 30, 25)
 $g.DrawString("Estimated Assets & Investor Sentiment Meter", $subFont, $textSubBrush, 32, 60)
 
 # Card 1: Asset Allocation (Left Box)
 $g.FillRectangle($cardBrush, 30, 95, 480, 320)
-$g.DrawString("📊 추정 보유 자산 비중 (Asset Allocation)", $labelFont, $textMainBrush, 50, 115)
+$g.DrawString("추정 보유 자산 비중 (Asset Allocation)", $labelFont, $textMainBrush, 50, 115)
 
 $items = @(
     @{ Name = "S&P500 / 미국 지수 ETF"; Pct = 45; Brush = $accentBlue; Text = "45%" },
@@ -67,7 +67,7 @@ foreach ($it in $items) {
 
 # Card 2: Sentiment Gauge Meter (Right Box)
 $g.FillRectangle($cardBrush, 540, 95, 330, 320)
-$g.DrawString("🔥 매수 심리 온도계 (Sentiment)", $labelFont, $textMainBrush, 560, 115)
+$g.DrawString("매수 심리 온도계 (Sentiment)", $labelFont, $textMainBrush, 560, 115)
 
 # Temperature Arc / Circle Gauge
 $gaugeBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(239, 68, 68)) # Red 65deg
@@ -79,8 +79,8 @@ $g.FillEllipse($gaugeBrush, 645, 170, 120, 120)
 $innerBg = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(30, 41, 59))
 $g.FillEllipse($innerBg, 660, 185, 90, 90)
 
-$tempFont = New-Object System.Drawing.Font("Segoe UI", 24, [System.Drawing.FontStyle]::Bold)
-$g.DrawString("65℃", $tempFont, $textMainBrush, 670, 208)
+$tempFont = New-Object System.Drawing.Font("Arial", 22, [System.Drawing.FontStyle]::Bold)
+$g.DrawString("65 C", $tempFont, $textMainBrush, 672, 210)
 
 $descFont = New-Object System.Drawing.Font("Malgun Gothic", 12, [System.Drawing.FontStyle]::Bold)
 $g.DrawString("신중한 분할 적립 구간", $descFont, $accentGreen, 620, 325)
@@ -91,4 +91,4 @@ $bmp.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
 
 $g.Dispose()
 $bmp.Dispose()
-Write-Host "Chart image generated at: $OutputPath" -ForegroundColor Green
+Write-Host "Clean chart image generated at: $OutputPath" -ForegroundColor Green

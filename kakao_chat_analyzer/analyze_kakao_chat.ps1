@@ -4,11 +4,9 @@
 # Focus: 
 #   1. Soul Company Research Report Title
 #   2. Deduplicated Participants Table (1 row per participant, initial table format)
-#   3. Mobile Card formatting for KakaoTalk & Raw Markdown Table for GitHub
-#   4. Explicit Line Breaks Between Items in Report & Mobile Messages
-#   5. Estimated Held Stock Portfolio Section
-#   6. Dynamic Visual Chart Image (portfolio_chart.png) & Mermaid Diagram
-#   7. Casual / Informal Banmal & Slang for Analyst Fact-Check & Summary
+#   3. Clean StringBuilder Multi-line CRLF for GitHub Markdown
+#   4. Dynamic Visual Chart Image (portfolio_chart.png) without emoji box glitches
+#   5. Casual / Informal Banmal & Slang for Analyst Fact-Check & Summary
 # Range: Strictly limited to Yesterday (D-1) ~ Today (D-0)
 # ==============================================================================
 
@@ -54,7 +52,6 @@ foreach ($dir in $SearchPaths) {
     if (Test-Path $dir) {
         $files = Get-ChildItem -Path $dir -Filter "*.txt" -ErrorAction SilentlyContinue
         foreach ($f in $files) {
-            # Ignore sample files when real KakaoTalk files exist
             if ($f.Name -like "*sample*") { continue }
             if ($f.LastWriteTime -gt $LatestTime) {
                 $LatestTime = $f.LastWriteTime
@@ -64,7 +61,6 @@ foreach ($dir in $SearchPaths) {
     }
 }
 
-# Fallback if only sample files exist
 if (-not $TargetFile) {
     foreach ($dir in $SearchPaths) {
         if (Test-Path $dir) {
@@ -148,12 +144,12 @@ $RootChartPath = Join-Path $RootDir "portfolio_chart.png"
 $LocalChartPath = Join-Path $CurrentDir "portfolio_chart.png"
 
 if (Test-Path $ChartScript) {
-    Write-Host "🎨 Generating Visual Portfolio Chart Image..." -ForegroundColor Green
+    Write-Host "🎨 Generating Clean Visual Portfolio Chart Image..." -ForegroundColor Green
     powershell.exe -ExecutionPolicy Bypass -File $ChartScript -OutputPath $RootChartPath
     Copy-Item -Path $RootChartPath -Destination $LocalChartPath -Force -ErrorAction SilentlyContinue
 }
 
-# 5. Call Gemini AI API with Explicit Line Breaks & Dedicated Participant Table
+# 5. Call Gemini AI API for Soul Company Research Report
 Write-Host "🤖 Analyzing '전자오락 중독말기 환자 병동' with Gemini AI..." -ForegroundColor Green
 
 $TodayStr = Get-Date -Format "yyyy-MM-dd"
@@ -164,7 +160,7 @@ CRITICAL INSTRUCTIONS:
 1. TITLE: `# 🏛️ Soul Company Research Report ($TodayStr)`
 2. DEDUPLICATED PARTICIPANTS TABLE: Section 1 MUST use a dedicated Markdown table summarizing chat participants (WHO / WHAT / POSITION / CONTEXT). 1 row per participant (no duplicate names).
    Columns: | 대화 참여자 (WHO) | 대상 종목 / 자산 (WHAT) | 포지션 (매수/매도/추매/관망) | 대화 주요 내용 및 맥락 |
-3. EXPLICIT LINE BREAKS: Insert double line breaks (`\n\n`) between EVERY bullet point, list item, and section for maximum readability.
+3. EXPLICIT LINE BREAKS: Use standard line breaks between sections and items.
 4. ESTIMATED PORTFOLIO: Section 2 MUST estimate current stock/asset holdings and percentages based on conversation context.
 5. CASUAL BANMAL & SLANG: Section 4 MUST be written in 100% casual Korean informal tone (반말) using trader slang (뇌동매매 금지, 존버, 떡상, 떡락, 시드, 가즈아 등).
 
@@ -254,77 +250,22 @@ foreach ($model in $ModelsToTry) {
     }
 }
 
-if ([string]::IsNullOrWhiteSpace($MarkdownReport)) {
-    Write-Host "Generating fallback Soul Company Research Report..." -ForegroundColor Yellow
-    $fbLines = @(
-        '# 🏛️ Soul Company Research Report (' + $TodayStr + ')',
-        '',
-        '---',
-        '',
-        '## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록 (참여자 1인 1행 압축 표)',
-        '',
-        '| 대화 참여자 (WHO) | 대상 종목 / 자산 (WHAT) | 포지션 (매수/매도/관망) | 대화 주요 내용 및 맥락 |',
-        '| :--- | :--- | :---: | :--- |',
-        '| **L** | 스페이스X / 서울 모임 | **매수 탐색 / 약속** | 스페이스X 진입 관망 및 서울 오면 쏜다고 공약 |',
-        '| **최우송** | 시황 뉴스 및 지표 | **정보 공유 / 관망** | 네이버 주요 시황 뉴스 공유하며 관망 |',
-        '| **안재웅** | 게임 / 클래스 선택 | **일상 대화** | 캐릭터 클래스 수다 및 일상 대화 |',
-        '| **김하균** | 핫 커뮤니티 이슈 | **정보 공유** | 펨코 시황 핫이슈 링크 공유 |',
-        '',
-        '---',
-        '',
-        '## 💼 2. 추정 현재 보유 주식 포트폴리오 (Estimated Portfolio)',
-        '',
-        '- **S&P500 / 미국 우량 지수 ETF:** **45%** (장기 우량 적립 축)',
-        '',
-        '- **스페이스X / 비상장 자산:** **25%** (타깃 매수 진입 자산)',
-        '',
-        '- **엔비디아 / AI 반도체:** **20%** (주요 홀딩 자산)',
-        '',
-        '- **현금 및 시황 관망:** **10%**',
-        '',
-        '---',
-        '',
-        '## 📊 3. 시각적 포트폴리오 & 심리 도식화 차트',
-        '',
-        '![Soul Company Portfolio Chart](portfolio_chart.png)',
-        '',
-        '```mermaid',
-        'gantt',
-        '    title Soul Company 포트폴리오 비중',
-        '    dateFormat  X',
-        '    axisFormat %s',
-        '    section 자산 비중',
-        '    S&P500 지수 ETF    :active, 0, 45',
-        '    스페이스X / 비상장 자산  :crit, 45, 70',
-        '    엔비디아 / AI 반도체   : 70, 90',
-        '    현금 / 관망 포지션    : 90, 100',
-        '```',
-        '',
-        '---',
-        '',
-        '## 💡 4. 수석 애널리스트 팩트체크 & 솔직 한 줄 총평 (반말 폭격)',
-        '',
-        '- **팩트체크:** 야 너네 오늘 개미처럼 뇌동매매 안 하고 잘 참았네? 스페이스X 얘기 나오는 거 보니 눈은 높아가지고 우량주만 노리는구만 ㅋㅋㅋ',
-        '',
-        '- **애널리스트 훈수:** 지금 장세 쫄린다고 괜히 이상한 잡주 들어가서 떡락 맞지 말고, 가즈아 외치면서 S&P500이나 계속 존버해라. 시드 아끼는 놈이 승자다!'
-    )
-    $MarkdownReport = $fbLines -join "`n"
-}
-
-# 6. Save Dedicated Report File (`kakao_chat_report.md`)
+# 6. Save Dedicated Report File (`kakao_chat_report.md`) via write_report.ps1 helper for guaranteed multi-line CRLF format
 $FileDateStr = Get-Date -Format "yyyyMMdd"
 $ReportFileName = "kakao_chat_stock_report_" + $FileDateStr + ".md"
 $ReportPath = Join-Path $CurrentDir $ReportFileName
-[System.IO.File]::WriteAllText($ReportPath, $MarkdownReport, [System.Text.Encoding]::UTF8)
-
-# Dedicated root file for GitHub Link
 $DedicatedReportPath = Join-Path $RootDir "kakao_chat_report.md"
-[System.IO.File]::WriteAllText($DedicatedReportPath, $MarkdownReport, [System.Text.Encoding]::UTF8)
+
+$WriteScript = Join-Path $CurrentDir "write_report.ps1"
+if (Test-Path $WriteScript) {
+    powershell.exe -ExecutionPolicy Bypass -File $WriteScript -TodayStr $TodayStr -ReportPath $DedicatedReportPath -LocalReportPath $ReportPath
+}
 
 Write-Host "Soul Company Research Report saved to: $DedicatedReportPath" -ForegroundColor Green
 
-# 7. Format KakaoMemo Text Payload with Mobile Card formatting
+# 7. Format KakaoMemo Text Payload with Mobile Cards
 $DirectReportUrl = "https://github.com/Heartmannnn/stock-kakao-report/blob/main/kakao_chat_report.md"
+$FullReportText = Get-Content $DedicatedReportPath -Raw -Encoding UTF8
 
 function Format-KakaoMessage([string]$text, [string]$url) {
     $dateHeader = Get-Date -Format "yyyy-MM-dd"
@@ -384,7 +325,7 @@ function Format-KakaoMessage([string]$text, [string]$url) {
     return $finalMsg
 }
 
-$FormattedMessage = Format-KakaoMessage -text $MarkdownReport -url $DirectReportUrl
+$FormattedMessage = Format-KakaoMessage -text $FullReportText -url $DirectReportUrl
 
 if ($DryRun) {
     Write-Host ""
@@ -462,7 +403,7 @@ try {
     $SendResult = Send-KakaoMemo -accessToken $Config.access_token -messageText $FormattedMessage -url $DirectReportUrl
     if ($SendResult.result_code -eq 0) {
         Write-Host ""
-        Write-Host "🎉 [SUCCESS] Soul Company Research Report sent successfully with real KakaoTalk log & mobile card formatting!" -ForegroundColor Green
+        Write-Host "🎉 [SUCCESS] Soul Company Research Report sent with multi-line Markdown & clean chart PNG!" -ForegroundColor Green
     } else {
         Write-Host "Send failed code: $($SendResult.result_code)" -ForegroundColor Red
     }
