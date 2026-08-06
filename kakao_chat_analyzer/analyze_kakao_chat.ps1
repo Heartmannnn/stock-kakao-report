@@ -4,10 +4,11 @@
 # Focus: 
 #   1. Soul Company Research Report Title
 #   2. Deduplicated Participants Table (1 row per participant, initial table format)
-#   3. Explicit Line Breaks Between Items in Report & Mobile Messages
-#   4. Estimated Held Stock Portfolio Section
-#   5. Dynamic Visual Chart Image (portfolio_chart.png) & Mermaid Diagram
-#   6. Casual / Informal Banmal & Slang for Analyst Fact-Check & Summary
+#   3. Mobile Card formatting for KakaoTalk & Raw Markdown Table for GitHub
+#   4. Explicit Line Breaks Between Items in Report & Mobile Messages
+#   5. Estimated Held Stock Portfolio Section
+#   6. Dynamic Visual Chart Image (portfolio_chart.png) & Mermaid Diagram
+#   7. Casual / Informal Banmal & Slang for Analyst Fact-Check & Summary
 # Range: Strictly limited to Yesterday (D-1) ~ Today (D-0)
 # ==============================================================================
 
@@ -38,12 +39,12 @@ if ([string]::IsNullOrWhiteSpace($GeminiApiKey)) {
     exit 1
 }
 
-# 2. Automatically locate the latest KakaoTalk chat log file
+# 2. Automatically locate the latest KakaoTalk chat log file (Prioritize KakaoTalk Received Files)
 $SearchPaths = @(
-    (Join-Path $CurrentDir "chat_logs"),
     "C:\Users\adi5s\OneDrive\Documents\카카오톡 받은 파일\KakaoTalk",
     "C:\Users\adi5s\OneDrive\Documents\카카오톡 받은 파일",
-    "C:\Users\adi5s\Documents\카카오톡 받은 파일"
+    "C:\Users\adi5s\Documents\카카오톡 받은 파일",
+    (Join-Path $CurrentDir "chat_logs")
 )
 
 $TargetFile = $null
@@ -53,9 +54,26 @@ foreach ($dir in $SearchPaths) {
     if (Test-Path $dir) {
         $files = Get-ChildItem -Path $dir -Filter "*.txt" -ErrorAction SilentlyContinue
         foreach ($f in $files) {
+            # Ignore sample files when real KakaoTalk files exist
+            if ($f.Name -like "*sample*") { continue }
             if ($f.LastWriteTime -gt $LatestTime) {
                 $LatestTime = $f.LastWriteTime
                 $TargetFile = $f.FullName
+            }
+        }
+    }
+}
+
+# Fallback if only sample files exist
+if (-not $TargetFile) {
+    foreach ($dir in $SearchPaths) {
+        if (Test-Path $dir) {
+            $files = Get-ChildItem -Path $dir -Filter "*.txt" -ErrorAction SilentlyContinue
+            foreach ($f in $files) {
+                if ($f.LastWriteTime -gt $LatestTime) {
+                    $LatestTime = $f.LastWriteTime
+                    $TargetFile = $f.FullName
+                }
             }
         }
     }
@@ -305,22 +323,23 @@ $DedicatedReportPath = Join-Path $RootDir "kakao_chat_report.md"
 
 Write-Host "Soul Company Research Report saved to: $DedicatedReportPath" -ForegroundColor Green
 
-# 7. Format KakaoMemo Text Payload with Explicit Line Breaks
+# 7. Format KakaoMemo Text Payload with Mobile Card formatting
 $DirectReportUrl = "https://github.com/Heartmannnn/stock-kakao-report/blob/main/kakao_chat_report.md"
 
 function Format-KakaoMessage([string]$text, [string]$url) {
     $dateHeader = Get-Date -Format "yyyy-MM-dd"
     $linesList = New-Object System.Collections.Generic.List[string]
-    $linesList.Add("🏛️ [Soul Company Report] 병동 매매실록 - $dateHeader")
+    $linesList.Add("🏛️ [Soul Company Report] 병동 매매실록 - $dateHeader`n")
     $linesList.Add("------------------------------------`n")
 
     $reportLines = $text -split "`r?`n"
     $sec = ""
     foreach ($line in $reportLines) {
         $lStr = $line.Trim()
-        if ($lStr.Contains("1.") -or $lStr.Contains("매수 / 매도")) { 
+        
+        if ($lStr.Contains("1.") -or $lStr.Contains("매수 / 매도") -or $lStr.Contains("참여자별")) { 
             $sec = "WHO"
-            $linesList.Add("🛒 [참여자별 매수/매도 실록 (1인 1행 표)]`n")
+            $linesList.Add("🛒 [참여자별 매수/매도 실록 (1인 1행)]`n")
             continue 
         }
         if ($lStr.Contains("2.") -or $lStr.Contains("포트폴리오")) { 
@@ -328,13 +347,27 @@ function Format-KakaoMessage([string]$text, [string]$url) {
             $linesList.Add("`n💼 [추정 보유 자산 포트폴리오]`n")
             continue 
         }
-        if ($lStr.Contains("4.") -or $lStr.Contains("총평") -or $lStr.Contains("팩트체크")) { 
+        if ($lStr.Contains("4.") -or $lStr.Contains("총평") -or $lStr.Contains("팩트체크") -or $lStr.Contains("훈수")) { 
             $sec = "ADVICE"
             $linesList.Add("`n💡 [수석 애널리스트 솔직 훈수 (반말)]`n")
             continue 
         }
 
-        if ($sec -and $lStr -and -not $lStr.StartsWith("#") -and -not $lStr.StartsWith("!") -and -not $lStr.StartsWith('```')) {
+        if ($sec -eq "WHO" -and $lStr.StartsWith("|") -and -not $lStr.Contains(":---") -and -not $lStr.Contains("WHO")) {
+            # Format markdown table row into clean mobile card
+            $parts = $lStr.Split('|') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            if ($parts.Count -ge 4) {
+                $who = $parts[0].Trim().Replace('*', '')
+                $what = $parts[1].Trim().Replace('*', '')
+                $pos = $parts[2].Trim().Replace('*', '')
+                $ctx = $parts[3].Trim().Replace('*', '')
+                $card = "👤 $who`n  • 자산: $what`n  • 포지션: $pos`n  • 맥락: $ctx`n"
+                $linesList.Add($card)
+            }
+            continue
+        }
+
+        if ($sec -and $lStr -and -not $lStr.StartsWith("#") -and -not $lStr.StartsWith("!") -and -not $lStr.StartsWith('```') -and -not $lStr.StartsWith("|")) {
             $linesList.Add($lStr + "`n")
         }
     }
@@ -429,7 +462,7 @@ try {
     $SendResult = Send-KakaoMemo -accessToken $Config.access_token -messageText $FormattedMessage -url $DirectReportUrl
     if ($SendResult.result_code -eq 0) {
         Write-Host ""
-        Write-Host "🎉 [SUCCESS] Soul Company Research Report sent successfully with line breaks & participant table!" -ForegroundColor Green
+        Write-Host "🎉 [SUCCESS] Soul Company Research Report sent successfully with real KakaoTalk log & mobile card formatting!" -ForegroundColor Green
     } else {
         Write-Host "Send failed code: $($SendResult.result_code)" -ForegroundColor Red
     }
