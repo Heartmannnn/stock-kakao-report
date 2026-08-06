@@ -3,10 +3,11 @@
 # Target Room: "전자오락 중독말기 환자 병동"
 # Focus: 
 #   1. Soul Company Research Report Title
-#   2. Deduplicated Participants Table (1 row per participant)
-#   3. Estimated Held Stock Portfolio Section
-#   4. Dynamic Visual Chart Image (portfolio_chart.png) & Mermaid Diagram
-#   5. Casual / Informal Banmal & Slang for Analyst Fact-Check & Summary
+#   2. Deduplicated Participants Table (1 row per participant, initial table format)
+#   3. Explicit Line Breaks Between Items in Report & Mobile Messages
+#   4. Estimated Held Stock Portfolio Section
+#   5. Dynamic Visual Chart Image (portfolio_chart.png) & Mermaid Diagram
+#   6. Casual / Informal Banmal & Slang for Analyst Fact-Check & Summary
 # Range: Strictly limited to Yesterday (D-1) ~ Today (D-0)
 # ==============================================================================
 
@@ -134,7 +135,7 @@ if (Test-Path $ChartScript) {
     Copy-Item -Path $RootChartPath -Destination $LocalChartPath -Force -ErrorAction SilentlyContinue
 }
 
-# 5. Call Gemini AI API with Updated 5 Requirements
+# 5. Call Gemini AI API with Explicit Line Breaks & Dedicated Participant Table
 Write-Host "🤖 Analyzing '전자오락 중독말기 환자 병동' with Gemini AI..." -ForegroundColor Green
 
 $TodayStr = Get-Date -Format "yyyy-MM-dd"
@@ -143,24 +144,38 @@ You are a Senior Analyst writing the 'Soul Company Research Report' based on Kak
 
 CRITICAL INSTRUCTIONS:
 1. TITLE: `# 🏛️ Soul Company Research Report ($TodayStr)`
-2. DEDUPLICATE PARTICIPANTS: In Section 1, each chat participant (WHO) MUST appear ONCE (1 row per person). Aggregate their comments into that single row.
-3. ESTIMATED PORTFOLIO: In Section 2, estimate current stock/asset holdings and percentages based on conversation context (e.g., S&P500 45%, SpaceX 25%, NVDA 20%, Cash 10%).
-4. CASUAL / INFORMAL BANMAL & SLANG: Section 4 (Fact Check & Analyst Advice) MUST be written in 100% casual Korean informal tone (반말) using trader slang/jokes (e.g., "야 뇌동매매 하지마라", "가즈아", "존버", "떡상", "떡락", "시드 아껴라", "개미 멸망전" etc.).
+2. DEDUPLICATED PARTICIPANTS TABLE: Section 1 MUST use a dedicated Markdown table summarizing chat participants (WHO / WHAT / POSITION / CONTEXT). 1 row per participant (no duplicate names).
+   Columns: | 대화 참여자 (WHO) | 대상 종목 / 자산 (WHAT) | 포지션 (매수/매도/추매/관망) | 대화 주요 내용 및 맥락 |
+3. EXPLICIT LINE BREAKS: Insert double line breaks (`\n\n`) between EVERY bullet point, list item, and section for maximum readability.
+4. ESTIMATED PORTFOLIO: Section 2 MUST estimate current stock/asset holdings and percentages based on conversation context.
+5. CASUAL BANMAL & SLANG: Section 4 MUST be written in 100% casual Korean informal tone (반말) using trader slang (뇌동매매 금지, 존버, 떡상, 떡락, 시드, 가즈아 등).
 
 Format the Korean Markdown Report strictly as follows:
 
 # 🏛️ Soul Company Research Report ($TodayStr)
 
-## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록 (참여자 1인 1행 압축)
+---
+
+## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록 (참여자 1인 1행 압축 표)
+
 | 대화 참여자 (WHO) | 대상 종목 / 자산 (WHAT) | 포지션 (매수/매도/추매/관망) | 대화 주요 내용 및 수량/단가 맥락 |
 
+---
+
 ## 💼 2. 추정 현재 보유 주식 포트폴리오 (Estimated Portfolio)
-- **S&P500 / 미국 우량 지수 ETF:** 45% (장기 적립 포지션)
-- **스페이스X / 비상장 우량 자산:** 25% (진입 관심 및 매수 타깃)
-- **엔비디아 / AI 반도체:** 20% (주요 보유 및 관망)
-- **현금 및 기타 관망 자산:** 10%
+
+- **S&P500 / 미국 우량 지수 ETF:** **45%** (장기 우량 적립 축)
+
+- **스페이스X / 비상장 우량 자산:** **25%** (타깃 매수 진입 자산)
+
+- **엔비디아 / AI 반도체:** **20%** (주요 홀딩 자산)
+
+- **현금 및 기타 관망 자산:** **10%**
+
+---
 
 ## 📊 3. 시각적 포트폴리오 & 심리 도식화 차트
+
 ![Soul Company Portfolio Chart](portfolio_chart.png)
 
 ```mermaid
@@ -175,8 +190,12 @@ gantt
     현금 / 관망 포지션    : 90, 100
 ```
 
-## 💡 4. 수석 애널리스트 팩트체크 & 솔직 한 줄 총평 (반말/은어 폭격)
+---
+
+## 💡 4. 수석 애널리스트 팩트체크 & 솔직 한 줄 총평 (반말/은어)
+
 - **팩트체크:** (반말과 주식 은어로 솔직하게 작성)
+
 - **애널리스트 훈수:** (반말과 주식 은어로 재미있고 솔직하게 작성)
 
 [Chat Log Data]
@@ -222,7 +241,10 @@ if ([string]::IsNullOrWhiteSpace($MarkdownReport)) {
     $fbLines = @(
         '# 🏛️ Soul Company Research Report (' + $TodayStr + ')',
         '',
-        '## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록 (참여자 1인 1행 압축)',
+        '---',
+        '',
+        '## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록 (참여자 1인 1행 압축 표)',
+        '',
         '| 대화 참여자 (WHO) | 대상 종목 / 자산 (WHAT) | 포지션 (매수/매도/관망) | 대화 주요 내용 및 맥락 |',
         '| :--- | :--- | :---: | :--- |',
         '| **L** | 스페이스X / 서울 모임 | **매수 탐색 / 약속** | 스페이스X 진입 관망 및 서울 오면 쏜다고 공약 |',
@@ -233,14 +255,19 @@ if ([string]::IsNullOrWhiteSpace($MarkdownReport)) {
         '---',
         '',
         '## 💼 2. 추정 현재 보유 주식 포트폴리오 (Estimated Portfolio)',
+        '',
         '- **S&P500 / 미국 우량 지수 ETF:** **45%** (장기 우량 적립 축)',
+        '',
         '- **스페이스X / 비상장 자산:** **25%** (타깃 매수 진입 자산)',
+        '',
         '- **엔비디아 / AI 반도체:** **20%** (주요 홀딩 자산)',
+        '',
         '- **현금 및 시황 관망:** **10%**',
         '',
         '---',
         '',
         '## 📊 3. 시각적 포트폴리오 & 심리 도식화 차트',
+        '',
         '![Soul Company Portfolio Chart](portfolio_chart.png)',
         '',
         '```mermaid',
@@ -258,7 +285,9 @@ if ([string]::IsNullOrWhiteSpace($MarkdownReport)) {
         '---',
         '',
         '## 💡 4. 수석 애널리스트 팩트체크 & 솔직 한 줄 총평 (반말 폭격)',
+        '',
         '- **팩트체크:** 야 너네 오늘 개미처럼 뇌동매매 안 하고 잘 참았네? 스페이스X 얘기 나오는 거 보니 눈은 높아가지고 우량주만 노리는구만 ㅋㅋㅋ',
+        '',
         '- **애널리스트 훈수:** 지금 장세 쫄린다고 괜히 이상한 잡주 들어가서 떡락 맞지 말고, 가즈아 외치면서 S&P500이나 계속 존버해라. 시드 아끼는 놈이 승자다!'
     )
     $MarkdownReport = $fbLines -join "`n"
@@ -276,14 +305,14 @@ $DedicatedReportPath = Join-Path $RootDir "kakao_chat_report.md"
 
 Write-Host "Soul Company Research Report saved to: $DedicatedReportPath" -ForegroundColor Green
 
-# 7. Format KakaoMemo Text Payload
+# 7. Format KakaoMemo Text Payload with Explicit Line Breaks
 $DirectReportUrl = "https://github.com/Heartmannnn/stock-kakao-report/blob/main/kakao_chat_report.md"
 
 function Format-KakaoMessage([string]$text, [string]$url) {
     $dateHeader = Get-Date -Format "yyyy-MM-dd"
     $linesList = New-Object System.Collections.Generic.List[string]
     $linesList.Add("🏛️ [Soul Company Report] 병동 매매실록 - $dateHeader")
-    $linesList.Add("------------------------------------")
+    $linesList.Add("------------------------------------`n")
 
     $reportLines = $text -split "`r?`n"
     $sec = ""
@@ -291,22 +320,22 @@ function Format-KakaoMessage([string]$text, [string]$url) {
         $lStr = $line.Trim()
         if ($lStr.Contains("1.") -or $lStr.Contains("매수 / 매도")) { 
             $sec = "WHO"
-            $linesList.Add("`n🛒 [참여자별 매수/매도 실록 (중복 압축)]")
+            $linesList.Add("🛒 [참여자별 매수/매도 실록 (1인 1행 표)]`n")
             continue 
         }
         if ($lStr.Contains("2.") -or $lStr.Contains("포트폴리오")) { 
             $sec = "PORT"
-            $linesList.Add("`n💼 [추정 보유 자산 포트폴리오]")
+            $linesList.Add("`n💼 [추정 보유 자산 포트폴리오]`n")
             continue 
         }
         if ($lStr.Contains("4.") -or $lStr.Contains("총평") -or $lStr.Contains("팩트체크")) { 
             $sec = "ADVICE"
-            $linesList.Add("`n💡 [수석 애널리스트 솔직 훈수 (반말)]")
+            $linesList.Add("`n💡 [수석 애널리스트 솔직 훈수 (반말)]`n")
             continue 
         }
 
         if ($sec -and $lStr -and -not $lStr.StartsWith("#") -and -not $lStr.StartsWith("!") -and -not $lStr.StartsWith('```')) {
-            $linesList.Add($lStr)
+            $linesList.Add($lStr + "`n")
         }
     }
 
@@ -400,7 +429,7 @@ try {
     $SendResult = Send-KakaoMemo -accessToken $Config.access_token -messageText $FormattedMessage -url $DirectReportUrl
     if ($SendResult.result_code -eq 0) {
         Write-Host ""
-        Write-Host "🎉 [SUCCESS] Soul Company Research Report sent successfully!" -ForegroundColor Green
+        Write-Host "🎉 [SUCCESS] Soul Company Research Report sent successfully with line breaks & participant table!" -ForegroundColor Green
     } else {
         Write-Host "Send failed code: $($SendResult.result_code)" -ForegroundColor Red
     }
