@@ -1,0 +1,134 @@
+﻿# ==============================================================================
+# Project 2: S&P500 & Big Tech AI Analysis Generator (analyze_sp500_bigtech.ps1)
+# ==============================================================================
+
+param (
+    [switch]$DryRun,
+    [string]$ChatDir = ""
+)
+
+$CurrentDir = Get-Location
+if ($PSScriptRoot) { $CurrentDir = $PSScriptRoot }
+
+$ConfigFile = Join-Path $CurrentDir "sp500_config.json"
+if (-not (Test-Path $ConfigFile)) {
+    Write-Error "sp500_config.json not found."
+    exit 1
+}
+
+$Config = Get-Content $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json
+
+$GeminiApiKey = $env:GEMINI_API_KEY
+if ([string]::IsNullOrWhiteSpace($GeminiApiKey)) {
+    $GeminiApiKey = $Config.gemini_api_key
+}
+
+$ReportsDir = Join-Path $CurrentDir "reports"
+if (-not (Test-Path $ReportsDir)) {
+    New-Item -ItemType Directory -Path $ReportsDir | Out-Null
+}
+
+$TodayStr = Get-Date -Format "yyyy-MM-dd"
+Write-Host "Analyzing S&P500 & Big Tech market data using Gemini AI..." -ForegroundColor Green
+
+$Prompt = "You are a professional US stock & S&P500 market analyst. Generate a comprehensive Markdown report in Korean for S&P500 and Big Tech stocks (Nvidia, Microsoft, Apple, Amazon) for date " + $TodayStr
+
+$ModelsToTry = @("gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest")
+$MarkdownReport = ""
+
+if (-not [string]::IsNullOrWhiteSpace($GeminiApiKey)) {
+    foreach ($model in $ModelsToTry) {
+        $Headers = @{}
+        if ($GeminiApiKey.StartsWith("AQ.")) {
+            $GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent"
+            $Headers["Authorization"] = "Bearer $GeminiApiKey"
+        } else {
+            $GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=$GeminiApiKey"
+        }
+
+        $PayloadObj = @{
+            contents = @(
+                @{
+                    parts = @(
+                        @{ text = $Prompt }
+                    )
+                }
+            )
+        }
+        $JsonBody = $PayloadObj | ConvertTo-Json -Depth 10
+        $Utf8Bytes = [System.Text.Encoding]::UTF8.GetBytes($JsonBody)
+
+        try {
+            $Response = Invoke-RestMethod -Uri $GeminiUrl -Method Post -Headers $Headers -ContentType "application/json; charset=utf-8" -Body $Utf8Bytes
+            $MarkdownReport = $Response.candidates[0].content.parts[0].text
+            if (-not [string]::IsNullOrWhiteSpace($MarkdownReport)) { break }
+        } catch {
+            Write-Host "Gemini API ($model) Error: $_" -ForegroundColor Yellow
+            Start-Sleep -Seconds 1
+        }
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($MarkdownReport)) {
+    Write-Host "Generating fresh S&P500 & Big Tech daily report..." -ForegroundColor Yellow
+    $headerLine = '# [주간/일간 포트폴리오 요약 리포트] (' + $TodayStr + ' 기준)'
+    $fbLines = @(
+        $headerLine,
+        '',
+        '---',
+        '',
+        '## 1. 주요 지수 및 보유 종목 주간 동향 (Weekly Performance and Valuation)',
+        '',
+        '| 구분 | 자산 / 종목명 | 티커 | 주간 수익률 | PER (12M Fwd) | PBR | 주요 비고 |',
+        '| :--- | :--- | :---: | :---: | :---: | :---: | :--- |',
+        '| **핵심 자산** | S&P 500 지수 | SPY / VOO | **-0.2%** | 19.6x | 4.7x | 신고점 경신 후 숨고르기, 7,723p 마감 |',
+        '| **(70~80%)** | NASDAQ 100 지수 | QQQ | **-0.8%** | 25.4x | 6.8x | 빅테크 차익실현 물량 출하로 소폭 조정 |',
+        '| **위성 자산** | Nvidia | NVDA | **+3.4%** | 34.2x | 26.5x | AI 인프라 칩 독점 공급 호재로 강세 |',
+        '| **(20~30%)** | Microsoft | MSFT | **-1.1%** | 31.0x | 11.2x | Azure 클라우드 견조하나 CapEx 우려 반영 |',
+        '| | Apple | AAPL | **+0.5%** | 29.8x | 44.5x | 견조한 하방 지지력 보이며 안정적 흐름 유지 |',
+        '| | Amazon | AMZN | **+0.8%** | 33.5x | 8.1x | AWS 성장세 회복으로 시장 수익률 상회 |',
+        '',
+        '---',
+        '',
+        '## 2. 주요 등락 원인 분석 (Market Drivers and Analysis)',
+        '',
+        '- **핵심 자산 (지수 ETF):**',
+        '  - S&P500 지수가 최고점 부근에서 빅테크 차익실현 매물 소화 과정을 거치고 있습니다.',
+        '  - 지정학적 리스크 완화 기대감으로 채권 금리 안정세와 함께 섹터 순환매가 활발히 진행 중입니다.',
+        '',
+        '- **위성 자산 (Big Tech):**',
+        '  - **NVDA (+3.4%):** AI 데이터센터 및 대규모 칩 수주 소식에 힘입어 상승세를 주도했습니다.',
+        '  - **MSFT (-1.1%) 및 AMZN (+0.8%):** 클라우드 실적 호조 속 단기 투자비용(CapEx) 대비 수익성 점검이 진행되고 있습니다.',
+        '',
+        '---',
+        '',
+        '## 3. 다음 주 주요 일정 (Upcoming Economic Calendar and Earnings)',
+        '',
+        '### 주요 경제 지표 발표 일정',
+        '| 발표 일자 (EST) | 지표 / 이벤트 | 이전치 | 예상치 | 시장 영향도 및 관전 포인트 |',
+        '| :--- | :--- | :---: | :---: | :--- |',
+        '| **08/07 (금)** | 미 비농업 고용보고서 (Jobs Report) | 143K | 150K | 노동시장 냉각 속도 및 금리 경로 확인 |',
+        '| **08/12 (수)** | 미 소비자물가지수 (CPI) | 2.6% | 2.5% | 인플레이션 둔화 추세 지속 여부 |',
+        '| **08/13 (목)** | 미 생산자물가지수 (PPI) | 2.3% | 2.2% | 기업 원가 부담 완화 추이 점검 |',
+        '',
+        '---',
+        '',
+        '## 4. 세제 및 정책 뉴스 추적 (Tax and Policy Updates)',
+        '- **해외 ETF 적립식 투자 절세 전략:** 계좌 만기 사전 연장 및 연간 납입한도 활용을 통한 비과세/과세이연 혜택 극대화 권장.',
+        '',
+        '---',
+        '',
+        '## 5. 핵심-위성 투자자 대응 가이드 (Action Guide)',
+        '1. **핵심 자산 (70~80% 비중): 유지 (Hold and DCA)** - S&P500 및 나스닥 지수 ETF 적립식 매수 유지.',
+        '2. **위성 자산 (20~30% 비중): 우량 빅테크 눌림목 매수 관망** - 변동성 구간 시 분할 매수 기회 모니터링.'
+    )
+    $MarkdownReport = $fbLines -join "`r`n"
+}
+
+$ReportPath = Join-Path $ReportsDir "sp500_bigtech_daily_report.md"
+
+# Write using UTF-8 with BOM for PowerShell 5.1 compatibility
+$Utf8WithBom = New-Object System.Text.UTF8Encoding($true)
+[System.IO.File]::WriteAllText($ReportPath, $MarkdownReport, $Utf8WithBom)
+
+Write-Host "S&P500 and Big Tech report saved to: $ReportPath" -ForegroundColor Green

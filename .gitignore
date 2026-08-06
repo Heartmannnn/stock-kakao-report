@@ -1,0 +1,9 @@
+# Ignore secret credentials & config files
+kakao_config.json
+sp500_config.json
+**/kakao_config.json
+**/sp500_config.json
+
+# Local chat log exports
+*.txt
+chat_logs/
