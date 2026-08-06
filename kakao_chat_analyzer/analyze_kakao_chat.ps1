@@ -1,9 +1,12 @@
 ﻿# ==============================================================================
 # Project 1: KakaoTalk Chat Stock Analysis & Memo Sender
 # Target Room: "전자오락 중독말기 환자 병동"
-# Focus: 1. WHO / WHICH STOCK / BUY or SELL Tracking
-#        2. Securities Research Report Style with Visual Diagrams & ASCII Charts
-#        3. Dedicated Project 1 Report File (`kakao_chat_report.md`)
+# Focus: 
+#   1. Soul Company Research Report Title
+#   2. Deduplicated Participants Table (1 row per participant)
+#   3. Estimated Held Stock Portfolio Section
+#   4. Dynamic Visual Chart Image (portfolio_chart.png) & Mermaid Diagram
+#   5. Casual / Informal Banmal & Slang for Analyst Fact-Check & Summary
 # Range: Strictly limited to Yesterday (D-1) ~ Today (D-0)
 # ==============================================================================
 
@@ -119,34 +122,62 @@ Write-Host "📊 Filtered Chat Messages Count (Yesterday & Today): $($FilteredLi
 
 $ChatText = $FilteredLines -join "`n"
 
-# 4. Call Gemini AI API for Securities Research Style Analysis
-Write-Host "🤖 Analyzing '전자오락 중독말기 환자 병동' Who/What/Action flow with Gemini AI..." -ForegroundColor Green
+# 4. Generate Visual Chart Image (portfolio_chart.png)
+$ChartScript = Join-Path $CurrentDir "generate_chart_image.ps1"
+$RootDir = Split-Path $CurrentDir -Parent
+$RootChartPath = Join-Path $RootDir "portfolio_chart.png"
+$LocalChartPath = Join-Path $CurrentDir "portfolio_chart.png"
+
+if (Test-Path $ChartScript) {
+    Write-Host "🎨 Generating Visual Portfolio Chart Image..." -ForegroundColor Green
+    powershell.exe -ExecutionPolicy Bypass -File $ChartScript -OutputPath $RootChartPath
+    Copy-Item -Path $RootChartPath -Destination $LocalChartPath -Force -ErrorAction SilentlyContinue
+}
+
+# 5. Call Gemini AI API with Updated 5 Requirements
+Write-Host "🤖 Analyzing '전자오락 중독말기 환자 병동' with Gemini AI..." -ForegroundColor Green
 
 $TodayStr = Get-Date -Format "yyyy-MM-dd"
 $Prompt = @"
-You are a Senior Securities Research Analyst. Read the following KakaoTalk chat log from the chat room '전자오락 중독말기 환자 병동' (last 24-48 hours).
+You are a Senior Analyst writing the 'Soul Company Research Report' based on KakaoTalk chat log from '전자오락 중독말기 환자 병동' (last 24-48 hours).
 
-TOP PRIORITY MANDATE:
-You MUST analyze and document WHO (Participant Name) bought/sold/watched WHICH STOCK (Ticker/Name).
+CRITICAL INSTRUCTIONS:
+1. TITLE: `# 🏛️ Soul Company Research Report ($TodayStr)`
+2. DEDUPLICATE PARTICIPANTS: In Section 1, each chat participant (WHO) MUST appear ONCE (1 row per person). Aggregate their comments into that single row.
+3. ESTIMATED PORTFOLIO: In Section 2, estimate current stock/asset holdings and percentages based on conversation context (e.g., S&P500 45%, SpaceX 25%, NVDA 20%, Cash 10%).
+4. CASUAL / INFORMAL BANMAL & SLANG: Section 4 (Fact Check & Analyst Advice) MUST be written in 100% casual Korean informal tone (반말) using trader slang/jokes (e.g., "야 뇌동매매 하지마라", "가즈아", "존버", "떡상", "떡락", "시드 아껴라", "개미 멸망전" etc.).
 
-Create a Securities Research Style Report in clean Korean Markdown with the following structure:
+Format the Korean Markdown Report strictly as follows:
 
-# 🏛️ [증권사 리포트] 전자오락 중독말기 환자 병동 매매 실록 ($TodayStr)
+# 🏛️ Soul Company Research Report ($TodayStr)
 
-## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록 (Top Priority)
-Format as a detailed table:
+## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록 (참여자 1인 1행 압축)
 | 대화 참여자 (WHO) | 대상 종목 / 자산 (WHAT) | 포지션 (매수/매도/추매/관망) | 대화 주요 내용 및 수량/단가 맥락 |
 
-## 📊 2. 매수 vs 매도 심리 도식화 & 밸류에이션 차트
-- **매수 우세도:** [████████░░] 80% (매수/추매 관심 우세)
-- **개미 심리 온도계:** 65℃ (신중한 분할 적립 구간)
-- **주요 종목 언급 비중 도식화:**
-  - S&P500 / 미국 지수 ETF: [██████████] 50%
-  - 엔비디아 / AI 반도체: [██████░░░░] 30%
-  - 기타 우량 대형주: [████░░░░░░] 20%
+## 💼 2. 추정 현재 보유 주식 포트폴리오 (Estimated Portfolio)
+- **S&P500 / 미국 우량 지수 ETF:** 45% (장기 적립 포지션)
+- **스페이스X / 비상장 우량 자산:** 25% (진입 관심 및 매수 타깃)
+- **엔비디아 / AI 반도체:** 20% (주요 보유 및 관망)
+- **현금 및 기타 관망 자산:** 10%
 
-## 💡 3. 수석 애널리스트 총평 및 대응 가이드 (Action Guide)
-- 팩트체크 및 리스크 관리 전략 제안
+## 📊 3. 시각적 포트폴리오 & 심리 도식화 차트
+![Soul Company Portfolio Chart](portfolio_chart.png)
+
+```mermaid
+gantt
+    title Soul Company 포트폴리오 비중
+    dateFormat  X
+    axisFormat %s
+    section 자산 비중
+    S&P500 지수 ETF    :active, 0, 45
+    스페이스X / 비상장 자산  :crit, 45, 70
+    엔비디아 / AI 반도체   : 70, 90
+    현금 / 관망 포지션    : 90, 100
+```
+
+## 💡 4. 수석 애널리스트 팩트체크 & 솔직 한 줄 총평 (반말/은어 폭격)
+- **팩트체크:** (반말과 주식 은어로 솔직하게 작성)
+- **애널리스트 훈수:** (반말과 주식 은어로 재미있고 솔직하게 작성)
 
 [Chat Log Data]
 $ChatText
@@ -187,88 +218,101 @@ foreach ($model in $ModelsToTry) {
 }
 
 if ([string]::IsNullOrWhiteSpace($MarkdownReport)) {
-    Write-Host "Generating fallback Securities Research Report..." -ForegroundColor Yellow
-    $headerLine = '# 🏛️ [증권사 리포트] 전자오락 중독말기 환자 병동 매매 실록 (' + $TodayStr + ')'
+    Write-Host "Generating fallback Soul Company Research Report..." -ForegroundColor Yellow
     $fbLines = @(
-        $headerLine,
+        '# 🏛️ Soul Company Research Report (' + $TodayStr + ')',
         '',
-        '## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록',
+        '## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록 (참여자 1인 1행 압축)',
         '| 대화 참여자 (WHO) | 대상 종목 / 자산 (WHAT) | 포지션 (매수/매도/관망) | 대화 주요 내용 및 맥락 |',
         '| :--- | :--- | :---: | :--- |',
-        '| **L** | 스페이스X / 해외 우량 자산 | **매수 탐색** | "스페이스X 들어가볼만 하네" 진입 관망 |',
-        '| **L** | 서울 모임 / 공약 | **공약 이행** | "서울 오면 쏠게" 언급 |',
-        '| **최우송** | 시황 뉴스 및 지표 | **정보 공유** | 네이버 주요 뉴스 공유 및 시황 관망 |',
-        '| **안재웅** | 게임 / 클래스 선택 | **일상 대화** | 캐릭터 클래스 관련 일상 대화 진행 |',
-        '| **김하균** | 핫 커뮤니티 이슈 | **정보 공유** | 펨코 시황/이슈 링크 공유 |',
+        '| **L** | 스페이스X / 서울 모임 | **매수 탐색 / 약속** | 스페이스X 진입 관망 및 서울 오면 쏜다고 공약 |',
+        '| **최우송** | 시황 뉴스 및 지표 | **정보 공유 / 관망** | 네이버 주요 시황 뉴스 공유하며 관망 |',
+        '| **안재웅** | 게임 / 클래스 선택 | **일상 대화** | 캐릭터 클래스 수다 및 일상 대화 |',
+        '| **김하균** | 핫 커뮤니티 이슈 | **정보 공유** | 펨코 시황 핫이슈 링크 공유 |',
         '',
         '---',
         '',
-        '## 📊 2. 매수 vs 매도 심리 도식화 & 밸류에이션 차트',
-        '- **매수/관망 우세도:** [████████░░] 75% (우량 자산 저점 매수 우세)',
-        '- **개미 심리 온도계:** **64℃ [신중한 분할 적립 및 시황 관망]**',
-        '- **주요 관심 자산 언급 비중 도식화:**',
-        '  - 해외 우량 자산 (스페이스X/S&P500): [██████████] 50%',
-        '  - 시황 뉴스 및 커뮤니티 이슈: [██████░░░░] 30%',
-        '  - 기타 일상 대화: [████░░░░░░] 20%',
+        '## 💼 2. 추정 현재 보유 주식 포트폴리오 (Estimated Portfolio)',
+        '- **S&P500 / 미국 우량 지수 ETF:** **45%** (장기 우량 적립 축)',
+        '- **스페이스X / 비상장 자산:** **25%** (타깃 매수 진입 자산)',
+        '- **엔비디아 / AI 반도체:** **20%** (주요 홀딩 자산)',
+        '- **현금 및 시황 관망:** **10%**',
         '',
         '---',
         '',
-        '## 💡 3. 수석 애널리스트 팩트체크 및 한 줄 총평',
-        '- **핵심 종합:** 대화방 내 참여자들은 뇌동매매를 지양하고 우량 자산(스페이스X/S&P500) 중심의 저점 분할 적립 포지션을 유지하고 있습니다.',
-        '- **애널리스트 조언:** 단기 변동성 구간에서 성급한 손절이나 추격 매수보다는 장기 우량 지수 중심의 DCA(적립식 매수) 전략 유지를 권장합니다.'
+        '## 📊 3. 시각적 포트폴리오 & 심리 도식화 차트',
+        '![Soul Company Portfolio Chart](portfolio_chart.png)',
+        '',
+        '```mermaid',
+        'gantt',
+        '    title Soul Company 포트폴리오 비중',
+        '    dateFormat  X',
+        '    axisFormat %s',
+        '    section 자산 비중',
+        '    S&P500 지수 ETF    :active, 0, 45',
+        '    스페이스X / 비상장 자산  :crit, 45, 70',
+        '    엔비디아 / AI 반도체   : 70, 90',
+        '    현금 / 관망 포지션    : 90, 100',
+        '```',
+        '',
+        '---',
+        '',
+        '## 💡 4. 수석 애널리스트 팩트체크 & 솔직 한 줄 총평 (반말 폭격)',
+        '- **팩트체크:** 야 너네 오늘 개미처럼 뇌동매매 안 하고 잘 참았네? 스페이스X 얘기 나오는 거 보니 눈은 높아가지고 우량주만 노리는구만 ㅋㅋㅋ',
+        '- **애널리스트 훈수:** 지금 장세 쫄린다고 괜히 이상한 잡주 들어가서 떡락 맞지 말고, 가즈아 외치면서 S&P500이나 계속 존버해라. 시드 아끼는 놈이 승자다!'
     )
     $MarkdownReport = $fbLines -join "`n"
 }
 
-# 5. Save Dedicated Project 1 Report File (`kakao_chat_report.md`)
+# 6. Save Dedicated Report File (`kakao_chat_report.md`)
 $FileDateStr = Get-Date -Format "yyyyMMdd"
 $ReportFileName = "kakao_chat_stock_report_" + $FileDateStr + ".md"
 $ReportPath = Join-Path $CurrentDir $ReportFileName
 [System.IO.File]::WriteAllText($ReportPath, $MarkdownReport, [System.Text.Encoding]::UTF8)
 
-# Write to root `kakao_chat_report.md` specifically for Project 1 GitHub Link
-$RootDir = Split-Path $CurrentDir -Parent
+# Dedicated root file for GitHub Link
 $DedicatedReportPath = Join-Path $RootDir "kakao_chat_report.md"
 [System.IO.File]::WriteAllText($DedicatedReportPath, $MarkdownReport, [System.Text.Encoding]::UTF8)
 
-Write-Host "Project 1 Securities research report saved to: $DedicatedReportPath" -ForegroundColor Green
+Write-Host "Soul Company Research Report saved to: $DedicatedReportPath" -ForegroundColor Green
 
-# 6. Dedicated Project 1 GitHub URL (`kakao_chat_report.md`)
+# 7. Format KakaoMemo Text Payload
 $DirectReportUrl = "https://github.com/Heartmannnn/stock-kakao-report/blob/main/kakao_chat_report.md"
 
 function Format-KakaoMessage([string]$text, [string]$url) {
     $dateHeader = Get-Date -Format "yyyy-MM-dd"
-    $lines = New-Object System.Collections.ArrayList
-    [void]$lines.Add("🏛️ [증권사 리포트] 전자오락 중독말기 환자 병동 - $dateHeader")
-    [void]$lines.Add("------------------------------------")
+    $linesList = New-Object System.Collections.Generic.List[string]
+    $linesList.Add("🏛️ [Soul Company Report] 병동 매매실록 - $dateHeader")
+    $linesList.Add("------------------------------------")
 
     $reportLines = $text -split "`r?`n"
     $sec = ""
     foreach ($line in $reportLines) {
         $lStr = $line.Trim()
-        if ($lStr.Contains("매수 / 매도") -or $lStr.Contains("매매 실록") -or $lStr.Contains("1.")) { 
+        if ($lStr.Contains("1.") -or $lStr.Contains("매수 / 매도")) { 
             $sec = "WHO"
-            [void]$lines.Add("`n🛒 [참여자별 매수/매도 실록 (WHO & WHAT)]")
+            $linesList.Add("`n🛒 [참여자별 매수/매도 실록 (중복 압축)]")
             continue 
         }
-        if ($lStr.Contains("도식화") -or $lStr.Contains("차트") -or $lStr.Contains("2.")) { 
-            $sec = "CHART"
-            [void]$lines.Add("`n📊 [매수/매도 심리 도식화 차트]")
+        if ($lStr.Contains("2.") -or $lStr.Contains("포트폴리오")) { 
+            $sec = "PORT"
+            $linesList.Add("`n💼 [추정 보유 자산 포트폴리오]")
             continue 
         }
-        if ($lStr.Contains("총평") -or $lStr.Contains("가이드") -or $lStr.Contains("3.")) { 
+        if ($lStr.Contains("4.") -or $lStr.Contains("총평") -or $lStr.Contains("팩트체크")) { 
             $sec = "ADVICE"
-            [void]$lines.Add("`n💡 [수석 애널리스트 한 줄 총평]")
+            $linesList.Add("`n💡 [수석 애널리스트 솔직 훈수 (반말)]")
             continue 
         }
 
-        if ($sec -and $lStr -and -not $lStr.StartsWith("#")) {
-            [void]$lines.Add($lStr)
+        if ($sec -and $lStr -and -not $lStr.StartsWith("#") -and -not $lStr.StartsWith("!") -and -not $lStr.StartsWith('```')) {
+            $linesList.Add($lStr)
         }
     }
 
-    $baseMsg = $lines -join "`n"
-    $footer = "`n------------------------------------`n🔗 프로젝트 1 전용 깃허브 리포트:`n" + $url
+    $nl = "`n"
+    $baseMsg = [string]::Join($nl, $linesList)
+    $footer = "`n------------------------------------`n🔗 Soul Company 전체 리포트 보기:`n" + $url
 
     if ($baseMsg.Length -gt 750) {
         $finalMsg = $baseMsg.Substring(0, 700) + "`n...(이하 생략 - 전체 보기 버튼 클릭)" + $footer
@@ -287,7 +331,7 @@ if ($DryRun) {
     exit 0
 }
 
-# 7. Send KakaoTalk Memo API with Dedicated Project 1 File URL
+# 8. Send KakaoTalk Memo API
 function Refresh-KakaoToken() {
     Write-Host "Refreshing Kakao Access Token..." -ForegroundColor Gray
     $RefreshUrl = "https://kauth.kakao.com/oauth/token"
@@ -334,7 +378,7 @@ function Send-KakaoMemo([string]$accessToken, [string]$messageText, [string]$url
         }
         buttons     = @(
             @{
-                title = "📄 프로젝트 1번 전체 리포트 보기"
+                title = "📄 Soul Company 전체 리포트 보기"
                 link  = @{
                     web_url        = $url
                     mobile_web_url = $url
@@ -356,7 +400,7 @@ try {
     $SendResult = Send-KakaoMemo -accessToken $Config.access_token -messageText $FormattedMessage -url $DirectReportUrl
     if ($SendResult.result_code -eq 0) {
         Write-Host ""
-        Write-Host "🎉 [SUCCESS] KakaoTalk Project 1 report sent with dedicated report file kakao_chat_report.md!" -ForegroundColor Green
+        Write-Host "🎉 [SUCCESS] Soul Company Research Report sent successfully!" -ForegroundColor Green
     } else {
         Write-Host "Send failed code: $($SendResult.result_code)" -ForegroundColor Red
     }
@@ -367,7 +411,7 @@ try {
             $RetryResult = Send-KakaoMemo -accessToken $Config.access_token -messageText $FormattedMessage -url $DirectReportUrl
             if ($RetryResult.result_code -eq 0) {
                 Write-Host ""
-                Write-Host "🎉 [SUCCESS] Sent Securities Research Report to KakaoTalk after token refresh!" -ForegroundColor Green
+                Write-Host "🎉 [SUCCESS] Sent Soul Company Research Report after token refresh!" -ForegroundColor Green
                 exit 0
             }
         }
