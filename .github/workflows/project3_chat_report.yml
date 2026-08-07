@@ -1,0 +1,44 @@
+name: Project 3 Manual Chat Log AI Analyzer (Cloud Task)
+
+on:
+  push:
+    paths:
+      - 'project3_chat_analyzer/chat_logs/**'
+      - 'chat_logs/**'
+  workflow_dispatch: # GitHub 웹 상에서 언제든 수동 버튼으로 실행 가능
+
+permissions:
+  contents: write
+
+jobs:
+  analyze-chat-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests Pillow
+
+      - name: Run Project 3 Chat Log AI Analyzer & Kakao Sender
+        env:
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python project3_chat_analyzer/project3_github_action.py
+
+      - name: Commit and push updated report and chart files
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add kakao_chat_report.md portfolio_chart.png
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update Soul Company report & chart by Project 3 GitHub Actions (Cloud)" && git push)
