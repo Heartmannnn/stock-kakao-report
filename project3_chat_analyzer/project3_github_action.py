@@ -2,9 +2,9 @@
 # Project 3: Manual Chat Log Analyzer & Cloud Report Generator
 # Features:
 #   1. Filters chat strictly starting from the LAST DATE HEADER to the end of file (1 day range)
-#   2. Dynamically extracts ALL unique participants on that day
-#   3. Generates Soul Company Research Report summarizing ALL participants
-#   4. Dynamic fallback parser (No static hardcoded dummy data)
+#   2. Prioritizes STOCK & INVESTMENT KEYWORDS: 주식, 주가, 반도체, 주식 밈, 회사 이름, 투자 용어, 유가, 환율, 달러, 금 시세 등
+#   3. Dynamically extracts ALL unique participants on that day
+#   4. Generates Soul Company Research Report summarizing ALL participants & investment topics
 #   5. Appends source chat log filename at the end of report & KakaoTalk message
 #   6. Cleans up older chat log files automatically
 # ==============================================================================
@@ -17,6 +17,14 @@ import urllib.parse
 import requests
 
 from generate_chart import generate_portfolio_chart
+
+# Domain Investment Keywords for prioritized parsing
+INVESTMENT_KEYWORDS = [
+    "주식", "주가", "반도체", "유가", "환율", "달러", "금", "금시세", "금 시세", "원달러",
+    "뇌동매매", "존버", "떡상", "떡락", "시드", "구조대", "가즈아", "물타기", "손절", "익절", "풀매수", "야수", "돔황챠",
+    "엔비디아", "NVDA", "마이크로소프트", "MSFT", "애플", "AAPL", "테슬라", "TSLA", "아람코", "삼성전자", "SK하이닉스", "스페이스X", "QQQ", "SPY", "VOO",
+    "PER", "PBR", "CapEx", "실적발표", "금리", "FOMC", "CPI", "PPI", "고용보고서", "해외ETF", "ISA", "비과세", "투자", "매수", "매도", "추매", "관망"
+]
 
 def get_env_or_config():
     rest_api_key = os.environ.get("KAKAO_REST_API_KEY")
@@ -87,7 +95,7 @@ def find_latest_chat_file_and_cleanup():
 def read_and_filter_today_chat(chat_file):
     if not chat_file or not os.path.exists(chat_file):
         print("Notice: Chat log file not found.")
-        return "", [], ""
+        return "", {}, ""
 
     try:
         with open(chat_file, "r", encoding="utf-8") as f:
@@ -111,16 +119,15 @@ def read_and_filter_today_chat(chat_file):
         day_lines = lines[last_date_idx:]
         print(f"📅 Filtered chat starting from date header at line {last_date_idx+1}: {date_label} ({len(day_lines)} lines)")
     else:
-        # Fallback to last 400 lines if no date divider found
         day_lines = lines[-400:] if len(lines) > 400 else lines
         date_label = datetime.date.today().strftime("%Y년 %m월 %d일")
 
     filtered_text_lines = [l.strip() for l in day_lines if l.strip()]
     filtered_text = "\n".join(filtered_text_lines)
 
-    # Extract all unique participant names from the day's lines
+    # Extract all unique participant names and their messages
     msg_pattern = re.compile(r'\[([^\]]+)\]\s*\[(?:오전|오후)\s*\d{1,2}:\d{2}\]\s*(.*)')
-    participants_map = {} # name -> list of messages
+    participants_map = {}
     for line in day_lines:
         m = msg_pattern.search(line)
         if m:
@@ -160,12 +167,23 @@ def generate_soul_company_report(today_str, chat_text, participants_map, chat_fi
     participants_str = ", ".join(participants_list) if participants_list else "참여자"
 
     if gemini_api_key and chat_text:
-        prompt = f"""You are a Senior Analyst writing the 'Soul Company Research Report' based on KakaoTalk chat log from '전자오락 중독말기 환자 병동' for date {today_str}.
+        prompt = f"""You are a Senior Stock & Investment Analyst writing the 'Soul Company Research Report' based on KakaoTalk chat log from '전자오락 중독말기 환자 병동' for date {today_str}.
+
+PRIORITY INVESTMENT PARSING FOCUS:
+Pay ULTRA-CLOSE ATTENTION and give MAXIMUM PRIORITY to the following keywords and topics:
+- 주식 & 주가 (Stocks, Stock Prices)
+- 반도체 (Semiconductors: Nvidia/NVDA, HBM, TSMC, Samsung, SK Hynix)
+- 주식 관련 밈 & 딜러 슬랭 (뇌동매매, 존버, 떡상, 떡락, 시드, 구조대, 가즈아, 물타기, 손절, 익절, 풀매수, 야수, 돔황챠 등)
+- 주식 회사 이름 (Nvidia, MSFT, Apple, Tesla, SpaceX, Aramco, 삼성전자, SK하이닉스 등)
+- 주식 및 투자 용어 (PER, PBR, CapEx, 실적발표, 금리, FOMC, CPI, PPI, 고용보고서, 해외ETF, ISA 등)
+- 거시경제 / 원자재 (유가, 환율, 달러, 금 시세)
+- 기타 모든 주식 시장 및 투자 관련 대화 내용
 
 CRITICAL INSTRUCTIONS:
 1. TITLE: `# 🏛️ Soul Company Research Report ({today_str})`
-2. SUMMARIZE ALL PARTICIPANTS: The chat participants found today are: [{participants_str}]. You MUST include EVERY single participant in Section 1 Markdown table (WHO / WHAT / POSITION / CONTEXT). Exactly 1 row per participant.
+2. SUMMARIZE ALL PARTICIPANTS WITH INVESTMENT FOCUS: The chat participants found today are: [{participants_str}]. You MUST include EVERY single participant in Section 1 Markdown table (WHO / WHAT / POSITION / CONTEXT). Exactly 1 row per participant.
    Columns: | 대화 참여자 (WHO) | 대상 종목 / 자산 (WHAT) | 포지션 (매수/매도/추매/관망) | 대화 주요 내용 및 맥락 |
+   Highlight specific stock tickers, oil/FX/gold context, investment memes, or trading comments for each participant.
 3. EXPLICIT LINE BREAKS: Insert double line breaks between EVERY section and list item.
 4. ESTIMATED PORTFOLIO: Section 2 MUST estimate current stock/asset holdings and percentages based on chat topics.
 5. CASUAL BANMAL & SLANG: Section 4 MUST be written in 100% casual Korean informal tone (반말) using trader slang (뇌동매매 금지, 존버, 떡상, 떡락, 시드, 가즈아 등).
@@ -191,16 +209,19 @@ CRITICAL INSTRUCTIONS:
             except Exception as e:
                 print(f"Gemini API ({m}) note: {e}")
 
-    # Dynamic Fallback Report (Generates actual participant rows from chat log)
+    # Dynamic Fallback Report scanning for investment keywords per participant
     table_rows = []
     if participants_map:
         for name, msgs in participants_map.items():
-            last_msg = msgs[-1] if msgs else "대화 정보 공유"
-            if len(last_msg) > 40:
-                last_msg = last_msg[:40] + "..."
-            table_rows.append(f"| **{name}** | 시황 및 관심 자산 | **관망 / 대화 공유** | {last_msg} |")
+            # Find any message with investment keywords first
+            invest_msgs = [m for m in msgs if any(kw in m for kw in INVESTMENT_KEYWORDS)]
+            selected_msg = invest_msgs[-1] if invest_msgs else (msgs[-1] if msgs else "시황 정보 공유 및 수다")
+            if len(selected_msg) > 40:
+                selected_msg = selected_msg[:40] + "..."
+            
+            table_rows.append(f"| **{name}** | 시황 / 주요 자산 | **관망 / 대화 공유** | {selected_msg} |")
     else:
-        table_rows.append("| **주요 참여자** | S&P500 / 빅테크 | **관망 / 적립** | 시황 뉴스 및 주요 자산 동향 공유 |")
+        table_rows.append("| **주요 참여자** | S&P500 / 반도체 / 환율 | **관망 / 적립** | 반도체, 환율, 금 시세 및 주식 시황 공유 |")
 
     table_markdown = "\n".join(table_rows)
 
@@ -248,9 +269,9 @@ gantt
 
 ## 💡 4. 수석 애널리스트 팩트체크 & 솔직 한 줄 총평 (반말 폭격)
 
-- **팩트체크:** 오늘 참여자({participants_str})들 뇌동매매 안 하고 분위기 잘 파악하면서 차분히 시황 공유 잘했네!
+- **팩트체크:** 오늘 참여자({participants_str})들 주식, 반도체, 환율/유가 시황 체크하면서 뇌동매매 안 하고 차분하게 잘 대응했네!
 
-- **애널리스트 훈수:** 장세 흔들린다고 잡주에 멘탈 털리지 말고, 가즈아 외치면서 우량주 중심으로 계속 존버해라. 시드 지키는 놈이 승자다!
+- **애널리스트 훈수:** 주가 흔들린다고 쫄려서 뇌동매매 하지 말고, 가즈아 외치면서 우량주 중심으로 계속 존버해라. 시드 지키는 놈이 승자다!
 
 ---
 
@@ -260,12 +281,13 @@ gantt
 def format_kakao_message(report_text, report_url, today_str, participants_map, chat_filename):
     participant_lines = []
     if participants_map:
-        for name, msgs in list(participants_map.items())[:5]: # top 5 for mobile card
-            last_msg = msgs[-1] if msgs else "대화 참여"
-            if len(last_msg) > 30: last_msg = last_msg[:30] + "..."
-            participant_lines.append(f"👤 {name}\n  • 포지션: 관망/공유\n  • 내용: {last_msg}")
+        for name, msgs in list(participants_map.items())[:5]:
+            invest_msgs = [m for m in msgs if any(kw in m for kw in INVESTMENT_KEYWORDS)]
+            selected_msg = invest_msgs[-1] if invest_msgs else (msgs[-1] if msgs else "시황 정보 공유")
+            if len(selected_msg) > 30: selected_msg = selected_msg[:30] + "..."
+            participant_lines.append(f"👤 {name}\n  • 포지션: 관망/공유\n  • 내용: {selected_msg}")
     else:
-        participant_lines.append("👤 대화 참여자 전체\n  • 내용: 시황 정보 공유 및 관망")
+        participant_lines.append("👤 대화 참여자 전체\n  • 내용: 주식, 반도체, 환율 시황 정보 공유")
 
     p_cards = "\n".join(participant_lines)
 
@@ -282,8 +304,8 @@ def format_kakao_message(report_text, report_url, today_str, participants_map, c
         "• 현금 및 시황 관망: 10%",
         "",
         "💡 [수석 애널리스트 솔직 훈수]",
-        "• 팩트체크: 오늘 뇌동매매 안 하고 차분하게 반응 잘했음!",
-        "• 훈수: 장세 흔들려도 쫄지 말고 S&P500 중심 존버해라!",
+        "• 팩트체크: 주식/반도체/환율 시황 체크하며 차분히 잘 반응함!",
+        "• 훈수: 뇌동매매 금지! S&P500 및 우량주 중심으로 존버해라!",
         "------------------------------------",
         f"📂 원본 대화 파일: {chat_filename}",
         f"🔗 Soul Company 전체 리포트: {report_url}"
@@ -323,7 +345,7 @@ def main():
     chat_file = find_latest_chat_file_and_cleanup()
     chat_filename = os.path.basename(chat_file) if chat_file else "None"
     
-    # 2. Filter chat strictly starting from LAST DATE HEADER (1 day range) & extract ALL participants
+    # 2. Filter chat strictly starting from LAST DATE HEADER & extract ALL participants & messages
     chat_text, participants_map, date_label = read_and_filter_today_chat(chat_file)
 
     # 3. Generate Chart PNG
@@ -331,7 +353,7 @@ def main():
     chart_path = os.path.join(repo_root, "portfolio_chart.png")
     generate_portfolio_chart(chart_path)
 
-    # 4. Generate Soul Company Markdown Report summarizing ALL participants
+    # 4. Generate Soul Company Markdown Report prioritizing Stock/Investment/Macro keywords
     report_text = generate_soul_company_report(today_str, chat_text, participants_map, chat_filename, gemini_api_key)
 
     clean_markdown = report_text.replace("\r\n", "\n").replace("\n", "\r\n")
