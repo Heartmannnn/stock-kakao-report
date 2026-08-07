@@ -1,7 +1,6 @@
 import os
 import json
 import datetime
-import urllib.parse
 import requests
 
 def get_env_or_config():
@@ -164,16 +163,17 @@ def send_kakao_memo(access_token, message_text, report_url):
             }
         ]
     }
-    json_template = json.dumps(template_obj, ensure_ascii=False)
-    encoded_template = urllib.parse.quote(json_template)
-    body_str = f"template_object={encoded_template}"
     
     headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
+        "Authorization": f"Bearer {access_token}"
     }
     
-    resp = requests.post(url, headers=headers, data=body_str.encode('utf-8'))
+    # Use requests dictionary payload so requests automatically handles form-encoding and url quoting perfectly
+    payload = {
+        "template_object": json.dumps(template_obj, ensure_ascii=False)
+    }
+    
+    resp = requests.post(url, headers=headers, data=payload)
     return resp
 
 def main():
@@ -203,7 +203,7 @@ def main():
 
     resp = send_kakao_memo(access_token, msg_text, report_url)
     if resp.status_code == 200 and resp.json().get("result_code") == 0:
-        print("🎉 [SUCCESS] GitHub Action sent S&P500 Morning Report to KakaoTalk!")
+        print("🎉 [SUCCESS] GitHub Action sent S&P500 Morning Report to KakaoTalk with direct Link & Button!")
     else:
         print(f"❌ Send failed: {resp.status_code} - {resp.text}")
 
