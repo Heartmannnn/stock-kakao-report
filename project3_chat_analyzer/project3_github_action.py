@@ -1,12 +1,11 @@
 # ==============================================================================
 # Project 3: Manual Chat Log Analyzer & Cloud Report Generator
 # Features:
-#   1. Scans project3_chat_analyzer/chat_logs/ and chat_logs/
-#   2. Automatically detects and picks the ABSOLUTE MOST RECENTLY SAVED .txt file
-#   3. Runs 100% on GitHub Actions Cloud (Independent of Desktop PC)
-#   4. Generates Soul Company Research Report (WHO/WHAT table, estimated portfolio, casual Banmal summary)
-#   5. Generates visual portfolio chart PNG (portfolio_chart.png)
-#   6. Delivers report & link button via KakaoTalk Memo API
+#   1. Scans project3_chat_analyzer/chat_logs/ and picks the latest chat file
+#   2. CLEANS UP (DELETES) all older chat log files, leaving strictly the latest file
+#   3. Generates Soul Company Research Report (WHO/WHAT table, portfolio, casual Banmal)
+#   4. APPENDS the source chat log filename at the end of report & KakaoTalk message
+#   5. Runs 100% on GitHub Actions Cloud (Independent of Desktop PC)
 # ==============================================================================
 
 import os
@@ -47,22 +46,18 @@ def extract_file_sort_key(file_path):
     fname = os.path.basename(file_path)
     mtime = os.path.getmtime(file_path)
     
-    # Try finding date numbers in filename e.g. 20260807_1730 or 20260807
     digits = "".join(re.findall(r'\d+', fname))
     num_val = int(digits) if len(digits) >= 8 else 0
     
     return (num_val, mtime, fname)
 
-def find_latest_chat_file():
+def find_latest_chat_file_and_cleanup():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.dirname(base_dir)
 
     search_dirs = [
         os.path.join(base_dir, "chat_logs"),
-        os.path.join(repo_root, "chat_logs"),
-        repo_root,
-        "C:\\Users\\adi5s\\OneDrive\\Documents\\카카오톡 받은 파일\\KakaoTalk",
-        "C:\\Users\\adi5s\\OneDrive\\Documents\\카카오톡 받은 파일"
+        os.path.join(repo_root, "chat_logs")
     ]
 
     all_txt_files = []
@@ -76,10 +71,19 @@ def find_latest_chat_file():
     if not all_txt_files:
         return None
 
-    # Sort files using composite sort key (filename timestamp + file modification time)
+    # Sort files using composite sort key
     all_txt_files.sort(key=extract_file_sort_key, reverse=True)
     latest_file = all_txt_files[0]
     print(f"🔍 Automatically selected latest chat log: {latest_file}")
+
+    # Feature 1: Clean up (delete) all older chat files, leaving only latest_file
+    for old_file in all_txt_files[1:]:
+        try:
+            os.remove(old_file)
+            print(f"🗑️ Cleaned up older chat log file: {os.path.basename(old_file)}")
+        except Exception as e:
+            print(f"Cleanup note ({old_file}): {e}")
+
     return latest_file
 
 def read_and_filter_chat(chat_file):
@@ -120,7 +124,7 @@ def refresh_kakao_token(rest_api_key, refresh_token, client_secret=""):
         print(f"❌ Token refresh failed: {resp.status_code} - {resp.text}")
         return None
 
-def generate_soul_company_report(today_str, chat_text, gemini_api_key=""):
+def generate_soul_company_report(today_str, chat_text, chat_filename, gemini_api_key=""):
     if gemini_api_key and chat_text:
         prompt = f"""You are a Senior Analyst writing the 'Soul Company Research Report' based on KakaoTalk chat log from '전자오락 중독말기 환자 병동' for date {today_str}.
 
@@ -148,6 +152,8 @@ CRITICAL INSTRUCTIONS:
                 if r.status_code == 200:
                     text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
                     if text.strip() and "Soul Company" in text:
+                        # Append chat filename at the end
+                        text += f"\n\n---\n\n📂 **[분석 대상 원본 대화 파일]:** `{chat_filename}`"
                         return text
             except Exception as e:
                 print(f"Gemini API ({m}) note: {e}")
@@ -201,10 +207,14 @@ gantt
 
 - **팩트체크:** 야 너네 오늘 개미처럼 뇌동매매 안 하고 잘 참았네? 스페이스X 얘기 나오는 거 보니 눈은 높아가지고 우량주만 노리는구만 ㅋㅋㅋ
 
-- **애널리스트 훈수:** 지금 장세 쫄린다고 괜히 이상한 잡주 들어가서 떡락 맞지 말고, 가즈아 외치면서 S&P500이나 계속 존버해라. 시드 아끼는 놈이 승자다!"""
+- **애널리스트 훈수:** 지금 장세 쫄린다고 괜히 이상한 잡주 들어가서 떡락 맞지 말고, 가즈아 외치면서 S&P500이나 계속 존버해라. 시드 아끼는 놈이 승자다!
+
+---
+
+📂 **[분석 대상 원본 대화 파일]:** `{chat_filename}`"""
     return fallback_report
 
-def format_kakao_message(report_text, report_url, today_str):
+def format_kakao_message(report_text, report_url, today_str, chat_filename):
     msg_lines = [
         f"🏛️ [Soul Company Report] 병동 매매실록 - {today_str}",
         "------------------------------------",
@@ -224,6 +234,7 @@ def format_kakao_message(report_text, report_url, today_str):
         "• 팩트체크: 야 너네 오늘 뇌동매매 안 하고 잘 참았네? 우량주만 노리는구만 ㅋㅋㅋ",
         "• 훈수: 지금 장세 쫄린다고 잡주 들어가지 말고 S&P500 존버해라!",
         "------------------------------------",
+        f"📂 원본 대화 파일: {chat_filename}",
         f"🔗 Soul Company 전체 리포트: {report_url}"
     ]
     return "\n".join(msg_lines)
@@ -257,8 +268,9 @@ def main():
         print("❌ Could not get valid Access Token.")
         return
 
-    # 1. Find the ABSOLUTE MOST RECENTLY SAVED chat log file
-    chat_file = find_latest_chat_file()
+    # 1. Find the ABSOLUTE MOST RECENTLY SAVED chat log file and CLEAN UP older files
+    chat_file = find_latest_chat_file_and_cleanup()
+    chat_filename = os.path.basename(chat_file) if chat_file else "None"
     chat_text = read_and_filter_chat(chat_file)
 
     # 2. Generate Chart PNG
@@ -266,8 +278,8 @@ def main():
     chart_path = os.path.join(repo_root, "portfolio_chart.png")
     generate_portfolio_chart(chart_path)
 
-    # 3. Generate Soul Company Markdown Report
-    report_text = generate_soul_company_report(today_str, chat_text, gemini_api_key)
+    # 3. Generate Soul Company Markdown Report with source filename footer
+    report_text = generate_soul_company_report(today_str, chat_text, chat_filename, gemini_api_key)
 
     clean_markdown = report_text.replace("\r\n", "\n").replace("\n", "\r\n")
     report_file = os.path.join(repo_root, "kakao_chat_report.md")
@@ -277,11 +289,11 @@ def main():
 
     # 4. Send KakaoMemo API
     report_url = "https://github.com/Heartmannnn/stock-kakao-report/blob/main/kakao_chat_report.md"
-    msg_text = format_kakao_message(report_text, report_url, today_str)
+    msg_text = format_kakao_message(report_text, report_url, today_str, chat_filename)
 
     resp = send_kakao_memo(access_token, msg_text, report_url)
     if resp.status_code == 200 and resp.json().get("result_code") == 0:
-        print("🎉 [SUCCESS] Project 3 Cloud Action sent Soul Company Report for latest chat file!")
+        print(f"🎉 [SUCCESS] Project 3 Cloud Action sent Soul Company Report for {chat_filename}!")
     else:
         print(f"❌ Send failed: {resp.status_code} - {resp.text}")
 

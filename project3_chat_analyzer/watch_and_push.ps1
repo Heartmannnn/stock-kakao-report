@@ -1,7 +1,10 @@
 # ==============================================================================
 # Project 3: Reliable Real-Time File Watcher Daemon (watch_and_push.ps1)
 # Uses 0% idle CPU (Start-Sleep 2), 100% reliable file change detector
-# Monitors project3_chat_analyzer/chat_logs/ for new .txt files and pushes to GitHub
+# Features:
+#   1. Detects newest chat file in project3_chat_analyzer/chat_logs/
+#   2. CLEANS UP (DELETES) older chat files so only 1 newest file remains
+#   3. Commits and pushes to GitHub Cloud
 # ==============================================================================
 
 [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -28,6 +31,20 @@ function Write-WatcherLog([string]$msg) {
     Write-Host $logLine -ForegroundColor Cyan
 }
 
+function Cleanup-OldChatFiles([string]$folder, [string]$latestFileName) {
+    $allFiles = Get-ChildItem -Path $folder -Filter "*.txt"
+    foreach ($f in $allFiles) {
+        if ($f.Name -ne $latestFileName -and $f.Name -ne ".gitkeep") {
+            try {
+                Remove-Item -Path $f.FullName -Force
+                Write-WatcherLog "🗑️ Cleaned up older chat log file: $($f.Name)"
+            } catch {
+                Write-WatcherLog "Cleanup note: $_"
+            }
+        }
+    }
+}
+
 Write-WatcherLog "🚀 Starting Project 3 Reliable File Watcher for folder: $WatchFolder"
 
 # Initialize last seen timestamp
@@ -36,6 +53,7 @@ $InitialFiles = Get-ChildItem -Path $WatchFolder -Filter "*.txt" | Sort-Object L
 if ($InitialFiles -and $InitialFiles.Count -gt 0) {
     $LastMtime = $InitialFiles[0].LastWriteTime
     Write-WatcherLog "Initial latest file: $($InitialFiles[0].Name) (LastWriteTime: $LastMtime)"
+    Cleanup-OldChatFiles -folder $WatchFolder -latestFileName $InitialFiles[0].Name
 }
 
 Write-WatcherLog "✅ FileWatcher daemon is active and monitoring every 2 seconds..."
@@ -53,10 +71,13 @@ while ($true) {
                     # Wait 2 seconds for OS file copy to complete
                     Start-Sleep -Seconds 2
                     
+                    # Clean up older files
+                    Cleanup-OldChatFiles -folder $WatchFolder -latestFileName $fname
+                    
                     Write-WatcherLog "⬆️ Committing and pushing $fname to GitHub Cloud..."
                     
                     & $GitPath -C $RootDir add . 2>&1 | Out-Null
-                    & $GitPath -C $RootDir commit -m "Auto-push chat log $fname by FileWatcher" 2>&1 | Out-Null
+                    & $GitPath -C $RootDir commit -m "Auto-push latest chat log $fname and clean older files" 2>&1 | Out-Null
                     & $GitPath -C $RootDir push origin main --force 2>&1 | Out-Null
                     
                     Write-WatcherLog "🎉 [SUCCESS] $fname uploaded to GitHub! Cloud Action triggered."
