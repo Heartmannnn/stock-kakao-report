@@ -134,7 +134,7 @@ $ReportPath = Join-Path $ReportsDir "sp500_bigtech_daily_report.md"
 $DedicatedReportPath = Join-Path $RootDir "sp500_bigtech_report.md"
 
 # Write using UTF-8 with BOM for PowerShell 5.1 & GitHub Markdown compatibility
-$Utf8WithBom = New-Object System.Text.EncodingUTF8Encoding($true)
+$Utf8WithBom = New-Object System.Text.UTF8Encoding($true)
 [System.IO.File]::WriteAllText($ReportPath, $MarkdownReport, $Utf8WithBom)
 [System.IO.File]::WriteAllText($DedicatedReportPath, $MarkdownReport, $Utf8WithBom)
 
