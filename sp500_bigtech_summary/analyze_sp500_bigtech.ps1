@@ -1,5 +1,6 @@
 ﻿# ==============================================================================
 # Project 2: S&P500 & Big Tech AI Analysis Generator (analyze_sp500_bigtech.ps1)
+# Saves both local daily report and dedicated root report for GitHub direct link
 # ==============================================================================
 
 param (
@@ -9,6 +10,7 @@ param (
 
 $CurrentDir = Get-Location
 if ($PSScriptRoot) { $CurrentDir = $PSScriptRoot }
+$RootDir = Split-Path $CurrentDir -Parent
 
 $ConfigFile = Join-Path $CurrentDir "sp500_config.json"
 if (-not (Test-Path $ConfigFile)) {
@@ -71,13 +73,13 @@ if (-not [string]::IsNullOrWhiteSpace($GeminiApiKey)) {
 
 if ([string]::IsNullOrWhiteSpace($MarkdownReport)) {
     Write-Host "Generating fresh S&P500 & Big Tech daily report..." -ForegroundColor Yellow
-    $headerLine = '# [주간/일간 포트폴리오 요약 리포트] (' + $TodayStr + ' 기준)'
+    $headerLine = '# 📈 [S&P 500 & BigTech 시황 요약 리포트] (' + $TodayStr + ' 기준)'
     $fbLines = @(
         $headerLine,
         '',
         '---',
         '',
-        '## 1. 주요 지수 및 보유 종목 주간 동향 (Weekly Performance and Valuation)',
+        '## 🛒 1. 주요 지수 및 보유 종목 주간 동향 (Weekly Performance and Valuation)',
         '',
         '| 구분 | 자산 / 종목명 | 티커 | 주간 수익률 | PER (12M Fwd) | PBR | 주요 비고 |',
         '| :--- | :--- | :---: | :---: | :---: | :---: | :--- |',
@@ -90,7 +92,7 @@ if ([string]::IsNullOrWhiteSpace($MarkdownReport)) {
         '',
         '---',
         '',
-        '## 2. 주요 등락 원인 분석 (Market Drivers and Analysis)',
+        '## 💡 2. 주요 등락 원인 분석 (Market Drivers and Analysis)',
         '',
         '- **핵심 자산 (지수 ETF):**',
         '  - S&P500 지수가 최고점 부근에서 빅테크 차익실현 매물 소화 과정을 거치고 있습니다.',
@@ -102,7 +104,7 @@ if ([string]::IsNullOrWhiteSpace($MarkdownReport)) {
         '',
         '---',
         '',
-        '## 3. 다음 주 주요 일정 (Upcoming Economic Calendar and Earnings)',
+        '## 📅 3. 다음 주 주요 일정 (Upcoming Economic Calendar and Earnings)',
         '',
         '### 주요 경제 지표 발표 일정',
         '| 발표 일자 (EST) | 지표 / 이벤트 | 이전치 | 예상치 | 시장 영향도 및 관전 포인트 |',
@@ -113,22 +115,27 @@ if ([string]::IsNullOrWhiteSpace($MarkdownReport)) {
         '',
         '---',
         '',
-        '## 4. 세제 및 정책 뉴스 추적 (Tax and Policy Updates)',
+        '## 🏛️ 4. 세제 및 정책 뉴스 추적 (Tax and Policy Updates)',
         '- **해외 ETF 적립식 투자 절세 전략:** 계좌 만기 사전 연장 및 연간 납입한도 활용을 통한 비과세/과세이연 혜택 극대화 권장.',
         '',
         '---',
         '',
-        '## 5. 핵심-위성 투자자 대응 가이드 (Action Guide)',
+        '## 🎯 5. 핵심-위성 투자자 대응 가이드 (Action Guide)',
         '1. **핵심 자산 (70~80% 비중): 유지 (Hold and DCA)** - S&P500 및 나스닥 지수 ETF 적립식 매수 유지.',
         '2. **위성 자산 (20~30% 비중): 우량 빅테크 눌림목 매수 관망** - 변동성 구간 시 분할 매수 기회 모니터링.'
     )
-    $MarkdownReport = $fbLines -join "`r`n"
+    $crlf = "`r`n"
+    $MarkdownReport = $fbLines -join $crlf
+} else {
+    $MarkdownReport = $MarkdownReport -replace "\r?\n", "`r`n"
 }
 
 $ReportPath = Join-Path $ReportsDir "sp500_bigtech_daily_report.md"
+$DedicatedReportPath = Join-Path $RootDir "sp500_bigtech_report.md"
 
-# Write using UTF-8 with BOM for PowerShell 5.1 compatibility
-$Utf8WithBom = New-Object System.Text.UTF8Encoding($true)
+# Write using UTF-8 with BOM for PowerShell 5.1 & GitHub Markdown compatibility
+$Utf8WithBom = New-Object System.Text.EncodingUTF8Encoding($true)
 [System.IO.File]::WriteAllText($ReportPath, $MarkdownReport, $Utf8WithBom)
+[System.IO.File]::WriteAllText($DedicatedReportPath, $MarkdownReport, $Utf8WithBom)
 
-Write-Host "S&P500 and Big Tech report saved to: $ReportPath" -ForegroundColor Green
+Write-Host "S&P500 and Big Tech report saved to: $DedicatedReportPath" -ForegroundColor Green

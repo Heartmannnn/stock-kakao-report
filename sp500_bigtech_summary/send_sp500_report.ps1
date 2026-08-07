@@ -10,6 +10,7 @@ param (
 [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $CurrentDir = Get-Location
 if ($PSScriptRoot) { $CurrentDir = $PSScriptRoot }
+$RootDir = Split-Path $CurrentDir -Parent
 
 $ConfigFile = Join-Path $CurrentDir "sp500_config.json"
 if (-not (Test-Path $ConfigFile)) {
@@ -20,28 +21,24 @@ if (-not (Test-Path $ConfigFile)) {
 $Config = Get-Content $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json
 
 # 1. Find report file
-$ReportsDir = Join-Path $CurrentDir "reports"
-if ([string]::IsNullOrWhiteSpace($ReportPath)) {
-    if (Test-Path $ReportsDir) {
-        $ReportFiles = Get-ChildItem -Path $ReportsDir -Filter "*.md" | Sort-Object LastWriteTime -Descending
-    }
+$DedicatedReportPath = Join-Path $RootDir "sp500_bigtech_report.md"
+if (Test-Path $DedicatedReportPath) {
+    $ReportFile = $DedicatedReportPath
+} else {
+    $ReportsDir = Join-Path $CurrentDir "reports"
+    $ReportFiles = Get-ChildItem -Path $ReportsDir -Filter "*.md" | Sort-Object LastWriteTime -Descending
     if (-not $ReportFiles -or $ReportFiles.Count -eq 0) {
-        $ReportFiles = Get-ChildItem -Path $CurrentDir -Filter "*.md" | Sort-Object LastWriteTime -Descending
-    }
-    if (-not $ReportFiles -or $ReportFiles.Count -eq 0) {
-        Write-Error "No report file found in '$ReportsDir'."
+        Write-Error "No report file found."
         exit 1
     }
     $ReportFile = $ReportFiles[0].FullName
-} else {
-    $ReportFile = $ReportPath
 }
 
 $ReportFileName = Split-Path $ReportFile -Leaf
 Write-Host "Target Report: $ReportFileName" -ForegroundColor Cyan
 
 # Working GitHub URL matching repository file
-$ReportUrl = "https://github.com/Heartmannnn/stock-kakao-report/blob/main/weekly_report_20260807.md"
+$ReportUrl = "https://github.com/Heartmannnn/stock-kakao-report/blob/main/sp500_bigtech_report.md"
 
 # 2. Read report content with UTF-8
 $RawContent = [System.IO.File]::ReadAllText($ReportFile, [System.Text.Encoding]::UTF8)
@@ -50,7 +47,7 @@ function Format-ReportForKakao([string]$text, [string]$url) {
     $dateStr = Get-Date -Format "yyyy-MM-dd"
     $linesList = New-Object System.Collections.ArrayList
     
-    [void]$linesList.Add("📊 [주식 포트폴리오 요약 리포트 - $dateStr]")
+    [void]$linesList.Add("📈 [S&P500 & 빅테크 시황 브리핑 - $dateStr]")
     [void]$linesList.Add("------------------------------------")
     
     $lines = $text -split "`r?`n"
@@ -60,10 +57,10 @@ function Format-ReportForKakao([string]$text, [string]$url) {
     $scheduleLines = New-Object System.Collections.ArrayList
     
     foreach ($line in $lines) {
-        if ($line.StartsWith("## 1.")) { $currentSec = "TABLE"; continue }
-        if ($line.StartsWith("## 2.")) { $currentSec = "CAUSE"; continue }
-        if ($line.StartsWith("## 3.")) { $currentSec = "SCHEDULE"; continue }
-        if ($line.StartsWith("## 4.") -or $line.StartsWith("## 5.")) { $currentSec = "END" }
+        if ($line.Contains("1.")) { $currentSec = "TABLE"; continue }
+        if ($line.Contains("2.")) { $currentSec = "CAUSE"; continue }
+        if ($line.Contains("3.")) { $currentSec = "SCHEDULE"; continue }
+        if ($line.Contains("4.") -or $line.Contains("5.")) { $currentSec = "END" }
         
         if ($currentSec -eq "TABLE" -and $line.StartsWith("|")) {
             if (-not ($line.Contains("---") -or $line.Contains("PER") -or $line.Contains("PBR"))) {
@@ -78,7 +75,7 @@ function Format-ReportForKakao([string]$text, [string]$url) {
         }
     }
     
-    [void]$linesList.Add("📈 [주요 자산 수익률 및 밸류에이션]")
+    [void]$linesList.Add("📊 [주요 자산 수익률 및 밸류에이션]")
     foreach ($tLine in $tableLines) {
         $cols = $tLine.Split("|") | Where-Object { $_.Trim() -ne "" } | ForEach-Object { $_.Trim() }
         if ($cols.Count -ge 5) {
@@ -118,7 +115,7 @@ function Format-ReportForKakao([string]$text, [string]$url) {
     }
     
     [void]$linesList.Add("------------------------------------")
-    [void]$linesList.Add("🔗 전체 리포트 보기:`n" + $url)
+    [void]$linesList.Add("🔗 S&P500 전체 리포트 보기:`n" + $url)
     
     $finalText = $linesList -join "`n"
     return $finalText
@@ -129,10 +126,7 @@ $FormattedMessage = Format-ReportForKakao -text $RawContent -url $ReportUrl
 if ($DryRun) {
     Write-Host ""
     Write-Host "[DryRun Mode - KakaoTalk Send Skipped]" -ForegroundColor Yellow
-    Write-Host ""
     Write-Host $FormattedMessage -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Message Length: $($FormattedMessage.Length) chars" -ForegroundColor Gray
     exit 0
 }
 
@@ -183,7 +177,15 @@ function Send-KakaoMemo([string]$accessToken, [string]$messageText, [string]$url
             web_url        = $url
             mobile_web_url = $url
         }
-        button_title = "📄 전체 리포트 보기"
+        buttons     = @(
+            @{
+                title = "📄 S&P500 전체 리포트 보기"
+                link  = @{
+                    web_url        = $url
+                    mobile_web_url = $url
+                }
+            }
+        )
     }
     
     $JsonTemplate = $TemplateObj | ConvertTo-Json -Compress -Depth 10
@@ -191,9 +193,7 @@ function Send-KakaoMemo([string]$accessToken, [string]$messageText, [string]$url
     $BodyString = "template_object=" + $EncodedTemplate
     $Utf8Bytes = [System.Text.Encoding]::UTF8.GetBytes($BodyString)
 
-    $Headers = @{
-        Authorization = "Bearer $accessToken"
-    }
+    $Headers = @{ Authorization = "Bearer $accessToken" }
     
     return Invoke-RestMethod -Uri $SendUrl -Method Post -Headers $Headers -ContentType "application/x-www-form-urlencoded;charset=utf-8" -Body $Utf8Bytes
 }
@@ -202,7 +202,7 @@ try {
     $SendResult = Send-KakaoMemo -accessToken $Config.access_token -messageText $FormattedMessage -url $ReportUrl
     if ($SendResult.result_code -eq 0) {
         Write-Host ""
-        Write-Host "[SUCCESS] Stock report sent to KakaoTalk with exact GitHub URL and UTF-8 encoding!" -ForegroundColor Green
+        Write-Host "🎉 [SUCCESS] S&P500 report sent to KakaoTalk with exact GitHub URL and UTF-8 encoding!" -ForegroundColor Green
     } else {
         Write-Host "Send failed code: $($SendResult.result_code)" -ForegroundColor Red
     }
@@ -215,7 +215,7 @@ try {
                 $RetryResult = Send-KakaoMemo -accessToken $Config.access_token -messageText $FormattedMessage -url $ReportUrl
                 if ($RetryResult.result_code -eq 0) {
                     Write-Host ""
-                    Write-Host "[SUCCESS] Sent SP500 report to KakaoTalk after token refresh!" -ForegroundColor Green
+                    Write-Host "🎉 [SUCCESS] Sent SP500 report to KakaoTalk after token refresh!" -ForegroundColor Green
                     exit 0
                 }
             } catch {
