@@ -14,7 +14,13 @@ if ($WatcherProcesses) {
         Stop-Process -Id $proc.ProcessId -Force
         Write-Host "✅ Terminated background FileWatcher PID: $($proc.ProcessId)" -ForegroundColor Green
     }
-    Write-Host "🎉 [RESTORE COMPLETE] Real-time watcher stopped. System restored to original manual state!" -ForegroundColor Green
-} else {
-    Write-Host "ℹ️ No running FileWatcher background process was found. System is already clean." -ForegroundColor Cyan
 }
+
+# Remove Startup VBScript if present
+$StartupVbs = [System.IO.Path]::Combine($env:APPDATA, 'Microsoft\Windows\Start Menu\Programs\Startup\Project3_FileWatcher_Startup.vbs')
+if (Test-Path $StartupVbs) {
+    Remove-Item -Path $StartupVbs -Force
+    Write-Host "✅ Removed Startup folder launcher: $StartupVbs" -ForegroundColor Green
+}
+
+Write-Host "🎉 [RESTORE COMPLETE] Real-time watcher stopped and startup entry removed. System restored to original manual state!" -ForegroundColor Green
