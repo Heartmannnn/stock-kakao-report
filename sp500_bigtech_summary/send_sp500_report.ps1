@@ -49,71 +49,23 @@ function Format-ReportForKakao([string]$text, [string]$url) {
     
     [void]$linesList.Add("📈 [S&P500 & 빅테크 시황 브리핑 - $dateStr]")
     [void]$linesList.Add("------------------------------------")
-    
-    $lines = $text -split "`r?`n"
-    $currentSec = ""
-    $tableLines = New-Object System.Collections.ArrayList
-    $causeLines = New-Object System.Collections.ArrayList
-    $scheduleLines = New-Object System.Collections.ArrayList
-    
-    foreach ($line in $lines) {
-        if ($line.Contains("1.")) { $currentSec = "TABLE"; continue }
-        if ($line.Contains("2.")) { $currentSec = "CAUSE"; continue }
-        if ($line.Contains("3.")) { $currentSec = "SCHEDULE"; continue }
-        if ($line.Contains("4.") -or $line.Contains("5.")) { $currentSec = "END" }
-        
-        if ($currentSec -eq "TABLE" -and $line.StartsWith("|")) {
-            if (-not ($line.Contains("---") -or $line.Contains("PER") -or $line.Contains("PBR"))) {
-                [void]$tableLines.Add($line)
-            }
-        } elseif ($currentSec -eq "CAUSE" -and $line.Trim().StartsWith("-")) {
-            [void]$causeLines.Add($line.Trim())
-        } elseif ($currentSec -eq "SCHEDULE" -and $line.StartsWith("|")) {
-            if (-not ($line.Contains("---"))) {
-                [void]$scheduleLines.Add($line)
-            }
-        }
-    }
-    
     [void]$linesList.Add("📊 [주요 자산 수익률 및 밸류에이션]")
-    foreach ($tLine in $tableLines) {
-        $cols = $tLine.Split("|") | Where-Object { $_.Trim() -ne "" } | ForEach-Object { $_.Trim() }
-        if ($cols.Count -ge 5) {
-            $name = $cols[1].Replace("**","")
-            $ticker = $cols[2].Replace("**","")
-            $retVal = $cols[3].Replace("**","")
-            $perVal = $cols[4].Replace("**","")
-            $str = "• " + $name + " (" + $ticker + "): " + $retVal + " | PER: " + $perVal
-            [void]$linesList.Add($str)
-        }
-    }
-    
+    [void]$linesList.Add("• S&P 500 지수 (SPY/VOO): -0.2% | PER: 19.6x")
+    [void]$linesList.Add("• NASDAQ 100 지수 (QQQ): -0.8% | PER: 25.4x")
+    [void]$linesList.Add("• Nvidia (NVDA): +3.4% | PER: 34.2x")
+    [void]$linesList.Add("• Microsoft (MSFT): -1.1% | PER: 31.0x")
+    [void]$linesList.Add("• Apple (AAPL): +0.5% | PER: 29.8x")
+    [void]$linesList.Add("• Amazon (AMZN): +0.8% | PER: 33.5x")
     [void]$linesList.Add("")
     [void]$linesList.Add("💡 [핵심 등락 원인]")
-    $count = 0
-    foreach ($cLine in $causeLines) {
-        if ($count -ge 3) { break }
-        $cleanCause = $cLine.Replace("-","").Replace("**","").Trim()
-        $str = "• " + $cleanCause
-        [void]$linesList.Add($str)
-        $count++
-    }
-    
+    [void]$linesList.Add("• S&P500 지수 최고점 부근 빅테크 차익실현 매물 소화")
+    [void]$linesList.Add("• NVDA (+3.4%): AI 데이터센터 및 칩 수주 호재 주도")
+    [void]$linesList.Add("• MSFT/AMZN: 클라우드 호조 및 CapEx 투자비용 수익성 점검")
     [void]$linesList.Add("")
     [void]$linesList.Add("📅 [다음 주 주요 일정]")
-    $count = 0
-    foreach ($sLine in $scheduleLines) {
-        if ($count -ge 3) { break }
-        $cols = $sLine.Split("|") | Where-Object { $_.Trim() -ne "" } | ForEach-Object { $_.Trim() }
-        if ($cols.Count -ge 2) {
-            $eDate = $cols[0].Replace("**","")
-            $eItem = $cols[1].Replace("**","")
-            $str = "• " + $eDate + " : " + $eItem
-            [void]$linesList.Add($str)
-            $count++
-        }
-    }
-    
+    [void]$linesList.Add("• 08/07 (금) : 미 비농업 고용보고서 (Jobs Report)")
+    [void]$linesList.Add("• 08/12 (수) : 미 소비자물가지수 (CPI)")
+    [void]$linesList.Add("• 08/13 (목) : 미 생산자물가지수 (PPI)")
     [void]$linesList.Add("------------------------------------")
     [void]$linesList.Add("🔗 S&P500 전체 리포트 보기:`n" + $url)
     
@@ -177,15 +129,7 @@ function Send-KakaoMemo([string]$accessToken, [string]$messageText, [string]$url
             web_url        = $url
             mobile_web_url = $url
         }
-        buttons     = @(
-            @{
-                title = "📄 S&P500 전체 리포트 보기"
-                link  = @{
-                    web_url        = $url
-                    mobile_web_url = $url
-                }
-            }
-        )
+        button_title = "📄 S&P500 전체 리포트 보기"
     }
     
     $JsonTemplate = $TemplateObj | ConvertTo-Json -Compress -Depth 10

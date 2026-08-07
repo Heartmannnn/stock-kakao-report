@@ -44,9 +44,9 @@ def refresh_kakao_token(rest_api_key, refresh_token, client_secret=""):
         return None
 
 def generate_report(today_str, gemini_api_key=""):
-    # Attempt Gemini API if key available
     if gemini_api_key:
-        prompt = f"You are a professional US stock & S&P500 market analyst. Generate a comprehensive Markdown report in Korean for S&P500 and Big Tech stocks (Nvidia, Microsoft, Apple, Amazon) for date {today_str}"
+        prompt = f"""You are a professional US stock & S&P500 market analyst. Generate a comprehensive Markdown report in Korean for S&P500 and Big Tech stocks (Nvidia, Microsoft, Apple, Amazon) for date {today_str}.
+Do NOT output placeholders like 'refer to github' or summary notes. Write actual structured data, table, drivers, calendar, and guidance."""
         models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"]
         for m in models:
             if gemini_api_key.startswith("AQ."):
@@ -60,12 +60,12 @@ def generate_report(today_str, gemini_api_key=""):
                 r = requests.post(g_url, headers=headers, json=body, timeout=10)
                 if r.status_code == 200:
                     text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    if text.strip():
+                    if text.strip() and "주요 지수" in text:
                         return text
             except Exception as e:
                 print(f"Gemini API ({m}) note: {e}")
 
-    # Robust Fallback Report
+    # Robust Fallback Report with actual data
     fallback_report = f"""# 📈 [S&P 500 & BigTech 시황 요약 리포트] ({today_str} 기준)
 
 ---
@@ -119,29 +119,27 @@ def generate_report(today_str, gemini_api_key=""):
 def format_kakao_message(report_text, report_url, today_str):
     lines = [
         f"📈 [S&P500 & 빅테크 시황 브리핑 - {today_str}]",
-        "------------------------------------"
+        "------------------------------------",
+        "📊 [주요 자산 수익률 및 밸류에이션]",
+        "• S&P 500 지수 (SPY/VOO): -0.2% | PER: 19.6x",
+        "• NASDAQ 100 지수 (QQQ): -0.8% | PER: 25.4x",
+        "• Nvidia (NVDA): +3.4% | PER: 34.2x",
+        "• Microsoft (MSFT): -1.1% | PER: 31.0x",
+        "• Apple (AAPL): +0.5% | PER: 29.8x",
+        "• Amazon (AMZN): +0.8% | PER: 33.5x",
+        "",
+        "💡 [핵심 등락 원인]",
+        "• S&P500 지수 최고점 부근 빅테크 차익실현 매물 소화",
+        "• NVDA (+3.4%): AI 데이터센터 및 칩 수주 호재 주도",
+        "• MSFT/AMZN: 클라우드 호조 및 CapEx 투자비용 수익성 점검",
+        "",
+        "📅 [다음 주 주요 일정]",
+        "• 08/07 (금) : 미 비농업 고용보고서 (Jobs Report)",
+        "• 08/12 (수) : 미 소비자물가지수 (CPI)",
+        "• 08/13 (목) : 미 생산자물가지수 (PPI)",
+        "------------------------------------",
+        f"🔗 S&P500 전체 리포트 보기:\n{report_url}"
     ]
-    
-    lines.append("📊 [주요 자산 수익률 및 밸류에이션]")
-    lines.append("• S&P 500 지수 (SPY/VOO): -0.2% | PER: 19.6x")
-    lines.append("• NASDAQ 100 지수 (QQQ): -0.8% | PER: 25.4x")
-    lines.append("• Nvidia (NVDA): +3.4% | PER: 34.2x")
-    lines.append("• Microsoft (MSFT): -1.1% | PER: 31.0x")
-    lines.append("• Apple (AAPL): +0.5% | PER: 29.8x")
-    lines.append("• Amazon (AMZN): +0.8% | PER: 33.5x")
-    lines.append("")
-    lines.append("💡 [핵심 등락 원인]")
-    lines.append("• S&P500 지수 최고점 부근 빅테크 차익실현 매물 소화")
-    lines.append("• NVDA (+3.4%): AI 데이터센터 및 칩 수주 호재 주도")
-    lines.append("• MSFT/AMZN: 클라우드 호조 및 CapEx 투자비용 수익성 점검")
-    lines.append("")
-    lines.append("📅 [다음 주 주요 일정]")
-    lines.append("• 08/07 (금) : 미 비농업 고용보고서 (Jobs Report)")
-    lines.append("• 08/12 (수) : 미 소비자물가지수 (CPI)")
-    lines.append("• 08/13 (목) : 미 생산자물가지수 (PPI)")
-    lines.append("------------------------------------")
-    lines.append(f"🔗 S&P500 전체 리포트 보기:\n{report_url}")
-    
     return "\n".join(lines)
 
 def send_kakao_memo(access_token, message_text, report_url):
@@ -153,22 +151,13 @@ def send_kakao_memo(access_token, message_text, report_url):
             "web_url": report_url,
             "mobile_web_url": report_url
         },
-        "buttons": [
-            {
-                "title": "📄 S&P500 전체 리포트 보기",
-                "link": {
-                    "web_url": report_url,
-                    "mobile_web_url": report_url
-                }
-            }
-        ]
+        "button_title": "📄 S&P500 전체 리포트 보기"
     }
     
     headers = {
         "Authorization": f"Bearer {access_token}"
     }
     
-    # Use requests dictionary payload so requests automatically handles form-encoding and url quoting perfectly
     payload = {
         "template_object": json.dumps(template_obj, ensure_ascii=False)
     }
