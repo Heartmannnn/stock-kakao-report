@@ -1,11 +1,12 @@
 # ==============================================================================
 # Project 3: Manual Chat Log Analyzer & Cloud Report Generator
 # Features:
-#   1. Scans project3_chat_analyzer/chat_logs/ and picks the latest chat file
-#   2. CLEANS UP (DELETES) all older chat log files, leaving strictly the latest file
-#   3. Generates Soul Company Research Report (WHO/WHAT table, portfolio, casual Banmal)
-#   4. APPENDS the source chat log filename at the end of report & KakaoTalk message
-#   5. Runs 100% on GitHub Actions Cloud (Independent of Desktop PC)
+#   1. Filters chat strictly starting from the LAST DATE HEADER to the end of file (1 day range)
+#   2. Dynamically extracts ALL unique participants on that day
+#   3. Generates Soul Company Research Report summarizing ALL participants
+#   4. Dynamic fallback parser (No static hardcoded dummy data)
+#   5. Appends source chat log filename at the end of report & KakaoTalk message
+#   6. Cleans up older chat log files automatically
 # ==============================================================================
 
 import os
@@ -45,10 +46,8 @@ def get_env_or_config():
 def extract_file_sort_key(file_path):
     fname = os.path.basename(file_path)
     mtime = os.path.getmtime(file_path)
-    
     digits = "".join(re.findall(r'\d+', fname))
     num_val = int(digits) if len(digits) >= 8 else 0
-    
     return (num_val, mtime, fname)
 
 def find_latest_chat_file_and_cleanup():
@@ -71,12 +70,11 @@ def find_latest_chat_file_and_cleanup():
     if not all_txt_files:
         return None
 
-    # Sort files using composite sort key
     all_txt_files.sort(key=extract_file_sort_key, reverse=True)
     latest_file = all_txt_files[0]
-    print(f"🔍 Automatically selected latest chat log: {latest_file}")
+    print(f"🔍 Selected latest chat log: {os.path.basename(latest_file)}")
 
-    # Feature 1: Clean up (delete) all older chat files, leaving only latest_file
+    # Clean up older chat files
     for old_file in all_txt_files[1:]:
         try:
             os.remove(old_file)
@@ -86,10 +84,10 @@ def find_latest_chat_file_and_cleanup():
 
     return latest_file
 
-def read_and_filter_chat(chat_file):
+def read_and_filter_today_chat(chat_file):
     if not chat_file or not os.path.exists(chat_file):
-        print("Notice: Chat log file not found. Using fallback analysis.")
-        return ""
+        print("Notice: Chat log file not found.")
+        return "", [], ""
 
     try:
         with open(chat_file, "r", encoding="utf-8") as f:
@@ -98,12 +96,45 @@ def read_and_filter_chat(chat_file):
         with open(chat_file, "r", encoding="cp949", errors="ignore") as f:
             lines = f.readlines()
 
-    if len(lines) > 400:
-        filtered = [l.strip() for l in lines[-400:] if l.strip()]
-    else:
-        filtered = [l.strip() for l in lines if l.strip()]
+    # Find the LAST date divider line e.g. --------------- 2026년 8월 7일 금요일 ---------------
+    date_header_pattern = re.compile(r'---------------\s*(\d{4}년\s*\d{1,2}월\s*\d{1,2}일[^-]*)\s*---------------')
+    
+    last_date_idx = -1
+    date_label = ""
+    for idx, line in enumerate(lines):
+        match = date_header_pattern.search(line)
+        if match:
+            last_date_idx = idx
+            date_label = match.group(1).strip()
 
-    return "\n".join(filtered)
+    if last_date_idx >= 0:
+        day_lines = lines[last_date_idx:]
+        print(f"📅 Filtered chat starting from date header at line {last_date_idx+1}: {date_label} ({len(day_lines)} lines)")
+    else:
+        # Fallback to last 400 lines if no date divider found
+        day_lines = lines[-400:] if len(lines) > 400 else lines
+        date_label = datetime.date.today().strftime("%Y년 %m월 %d일")
+
+    filtered_text_lines = [l.strip() for l in day_lines if l.strip()]
+    filtered_text = "\n".join(filtered_text_lines)
+
+    # Extract all unique participant names from the day's lines
+    msg_pattern = re.compile(r'\[([^\]]+)\]\s*\[(?:오전|오후)\s*\d{1,2}:\d{2}\]\s*(.*)')
+    participants_map = {} # name -> list of messages
+    for line in day_lines:
+        m = msg_pattern.search(line)
+        if m:
+            pname = m.group(1).strip()
+            msg = m.group(2).strip()
+            if pname not in participants_map:
+                participants_map[pname] = []
+            if msg:
+                participants_map[pname].append(msg)
+
+    participants = list(participants_map.keys())
+    print(f"👥 Extracted {len(participants)} unique participants for the day: {', '.join(participants)}")
+
+    return filtered_text, participants_map, date_label
 
 def refresh_kakao_token(rest_api_key, refresh_token, client_secret=""):
     url = "https://kauth.kakao.com/oauth/token"
@@ -124,16 +155,19 @@ def refresh_kakao_token(rest_api_key, refresh_token, client_secret=""):
         print(f"❌ Token refresh failed: {resp.status_code} - {resp.text}")
         return None
 
-def generate_soul_company_report(today_str, chat_text, chat_filename, gemini_api_key=""):
+def generate_soul_company_report(today_str, chat_text, participants_map, chat_filename, gemini_api_key=""):
+    participants_list = list(participants_map.keys())
+    participants_str = ", ".join(participants_list) if participants_list else "참여자"
+
     if gemini_api_key and chat_text:
         prompt = f"""You are a Senior Analyst writing the 'Soul Company Research Report' based on KakaoTalk chat log from '전자오락 중독말기 환자 병동' for date {today_str}.
 
 CRITICAL INSTRUCTIONS:
 1. TITLE: `# 🏛️ Soul Company Research Report ({today_str})`
-2. DEDUPLICATED PARTICIPANTS TABLE: Section 1 MUST use a dedicated Markdown table summarizing chat participants (WHO / WHAT / POSITION / CONTEXT). Exactly 1 row per participant (no duplicate names).
+2. SUMMARIZE ALL PARTICIPANTS: The chat participants found today are: [{participants_str}]. You MUST include EVERY single participant in Section 1 Markdown table (WHO / WHAT / POSITION / CONTEXT). Exactly 1 row per participant.
    Columns: | 대화 참여자 (WHO) | 대상 종목 / 자산 (WHAT) | 포지션 (매수/매도/추매/관망) | 대화 주요 내용 및 맥락 |
 3. EXPLICIT LINE BREAKS: Insert double line breaks between EVERY section and list item.
-4. ESTIMATED PORTFOLIO: Section 2 MUST estimate current stock/asset holdings and percentages.
+4. ESTIMATED PORTFOLIO: Section 2 MUST estimate current stock/asset holdings and percentages based on chat topics.
 5. CASUAL BANMAL & SLANG: Section 4 MUST be written in 100% casual Korean informal tone (반말) using trader slang (뇌동매매 금지, 존버, 떡상, 떡락, 시드, 가즈아 등).
 
 [Chat Log Data]
@@ -152,24 +186,33 @@ CRITICAL INSTRUCTIONS:
                 if r.status_code == 200:
                     text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
                     if text.strip() and "Soul Company" in text:
-                        # Append chat filename at the end
                         text += f"\n\n---\n\n📂 **[분석 대상 원본 대화 파일]:** `{chat_filename}`"
                         return text
             except Exception as e:
                 print(f"Gemini API ({m}) note: {e}")
 
+    # Dynamic Fallback Report (Generates actual participant rows from chat log)
+    table_rows = []
+    if participants_map:
+        for name, msgs in participants_map.items():
+            last_msg = msgs[-1] if msgs else "대화 정보 공유"
+            if len(last_msg) > 40:
+                last_msg = last_msg[:40] + "..."
+            table_rows.append(f"| **{name}** | 시황 및 관심 자산 | **관망 / 대화 공유** | {last_msg} |")
+    else:
+        table_rows.append("| **주요 참여자** | S&P500 / 빅테크 | **관망 / 적립** | 시황 뉴스 및 주요 자산 동향 공유 |")
+
+    table_markdown = "\n".join(table_rows)
+
     fallback_report = f"""# 🏛️ Soul Company Research Report ({today_str})
 
 ---
 
-## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록 (참여자 1인 1행 압축 표)
+## 🛒 1. 참여자별 실시간 매수 / 매도 거래 실록 (전체 참여자 1인 1행 표)
 
 | 대화 참여자 (WHO) | 대상 종목 / 자산 (WHAT) | 포지션 (매수/매도/관망) | 대화 주요 내용 및 맥락 |
 | :--- | :--- | :---: | :--- |
-| **L** | 스페이스X / 서울 모임 | **매수 탐색 / 약속** | 스페이스X 진입 관망 및 서울 오면 쏜다고 공약 |
-| **최우송** | 시황 뉴스 및 지표 | **정보 공유 / 관망** | 네이버 주요 시황 뉴스 공유하며 관망 |
-| **안재웅** | 게임 / 클래스 선택 | **일상 대화** | 캐릭터 클래스 수다 및 일상 대화 |
-| **김하균** | 핫 커뮤니티 이슈 | **정보 공유** | 펨코 시황 핫이슈 링크 공유 |
+{table_markdown}
 
 ---
 
@@ -205,24 +248,32 @@ gantt
 
 ## 💡 4. 수석 애널리스트 팩트체크 & 솔직 한 줄 총평 (반말 폭격)
 
-- **팩트체크:** 야 너네 오늘 개미처럼 뇌동매매 안 하고 잘 참았네? 스페이스X 얘기 나오는 거 보니 눈은 높아가지고 우량주만 노리는구만 ㅋㅋㅋ
+- **팩트체크:** 오늘 참여자({participants_str})들 뇌동매매 안 하고 분위기 잘 파악하면서 차분히 시황 공유 잘했네!
 
-- **애널리스트 훈수:** 지금 장세 쫄린다고 괜히 이상한 잡주 들어가서 떡락 맞지 말고, 가즈아 외치면서 S&P500이나 계속 존버해라. 시드 아끼는 놈이 승자다!
+- **애널리스트 훈수:** 장세 흔들린다고 잡주에 멘탈 털리지 말고, 가즈아 외치면서 우량주 중심으로 계속 존버해라. 시드 지키는 놈이 승자다!
 
 ---
 
 📂 **[분석 대상 원본 대화 파일]:** `{chat_filename}`"""
     return fallback_report
 
-def format_kakao_message(report_text, report_url, today_str, chat_filename):
+def format_kakao_message(report_text, report_url, today_str, participants_map, chat_filename):
+    participant_lines = []
+    if participants_map:
+        for name, msgs in list(participants_map.items())[:5]: # top 5 for mobile card
+            last_msg = msgs[-1] if msgs else "대화 참여"
+            if len(last_msg) > 30: last_msg = last_msg[:30] + "..."
+            participant_lines.append(f"👤 {name}\n  • 포지션: 관망/공유\n  • 내용: {last_msg}")
+    else:
+        participant_lines.append("👤 대화 참여자 전체\n  • 내용: 시황 정보 공유 및 관망")
+
+    p_cards = "\n".join(participant_lines)
+
     msg_lines = [
         f"🏛️ [Soul Company Report] 병동 매매실록 - {today_str}",
         "------------------------------------",
-        "🛒 [참여자별 매수/매도 실록 (1인 1행)]",
-        "👤 L\n  • 자산: 스페이스X / 서울 모임\n  • 포지션: 매수 탐색\n  • 맥락: 스페이스X 진입 관망 및 서울 오면 쏜다고 공약",
-        "👤 최우송\n  • 자산: 시황 뉴스 및 지표\n  • 포지션: 정보 공유\n  • 맥락: 네이버 주요 시황 뉴스 공유하며 관망",
-        "👤 안재웅\n  • 자산: 게임 / 클래스 선택\n  • 포지션: 일상 대화\n  • 맥락: 캐릭터 클래스 수다 및 일상 대화",
-        "👤 김하균\n  • 자산: 핫 커뮤니티 이슈\n  • 포지션: 정보 공유\n  • 맥락: 펨코 시황 핫이슈 링크 공유",
+        "🛒 [참여자별 매수/매도 실록]",
+        p_cards,
         "",
         "💼 [추정 보유 자산 포트폴리오]",
         "• S&P500 / 미국 지수 ETF: 45%",
@@ -230,9 +281,9 @@ def format_kakao_message(report_text, report_url, today_str, chat_filename):
         "• 엔비디아 / AI 반도체: 20%",
         "• 현금 및 시황 관망: 10%",
         "",
-        "💡 [수석 애널리스트 솔직 훈수 (반말)]",
-        "• 팩트체크: 야 너네 오늘 뇌동매매 안 하고 잘 참았네? 우량주만 노리는구만 ㅋㅋㅋ",
-        "• 훈수: 지금 장세 쫄린다고 잡주 들어가지 말고 S&P500 존버해라!",
+        "💡 [수석 애널리스트 솔직 훈수]",
+        "• 팩트체크: 오늘 뇌동매매 안 하고 차분하게 반응 잘했음!",
+        "• 훈수: 장세 흔들려도 쫄지 말고 S&P500 중심 존버해라!",
         "------------------------------------",
         f"📂 원본 대화 파일: {chat_filename}",
         f"🔗 Soul Company 전체 리포트: {report_url}"
@@ -268,28 +319,30 @@ def main():
         print("❌ Could not get valid Access Token.")
         return
 
-    # 1. Find the ABSOLUTE MOST RECENTLY SAVED chat log file and CLEAN UP older files
+    # 1. Find latest chat file & clean up older files
     chat_file = find_latest_chat_file_and_cleanup()
     chat_filename = os.path.basename(chat_file) if chat_file else "None"
-    chat_text = read_and_filter_chat(chat_file)
+    
+    # 2. Filter chat strictly starting from LAST DATE HEADER (1 day range) & extract ALL participants
+    chat_text, participants_map, date_label = read_and_filter_today_chat(chat_file)
 
-    # 2. Generate Chart PNG
+    # 3. Generate Chart PNG
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     chart_path = os.path.join(repo_root, "portfolio_chart.png")
     generate_portfolio_chart(chart_path)
 
-    # 3. Generate Soul Company Markdown Report with source filename footer
-    report_text = generate_soul_company_report(today_str, chat_text, chat_filename, gemini_api_key)
+    # 4. Generate Soul Company Markdown Report summarizing ALL participants
+    report_text = generate_soul_company_report(today_str, chat_text, participants_map, chat_filename, gemini_api_key)
 
     clean_markdown = report_text.replace("\r\n", "\n").replace("\n", "\r\n")
     report_file = os.path.join(repo_root, "kakao_chat_report.md")
     with open(report_file, "w", encoding="utf-8") as f:
         f.write(clean_markdown)
-    print(f"📄 Saved Soul Company report to {report_file}")
+    print(f"📄 Saved Soul Company report for date {date_label} to {report_file}")
 
-    # 4. Send KakaoMemo API
+    # 5. Send KakaoMemo API
     report_url = "https://github.com/Heartmannnn/stock-kakao-report/blob/main/kakao_chat_report.md"
-    msg_text = format_kakao_message(report_text, report_url, today_str, chat_filename)
+    msg_text = format_kakao_message(report_text, report_url, today_str, participants_map, chat_filename)
 
     resp = send_kakao_memo(access_token, msg_text, report_url)
     if resp.status_code == 200 and resp.json().get("result_code") == 0:
