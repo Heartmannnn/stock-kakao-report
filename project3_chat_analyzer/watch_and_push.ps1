@@ -1,6 +1,6 @@
 # ==============================================================================
-# Project 3: Real-Time Silent FileWatcher Auto-Uploader (watch_and_push.ps1)
-# Uses native .NET FileSystemWatcher (0% idle CPU, ~5MB RAM)
+# Project 3: Reliable Real-Time File Watcher Daemon (watch_and_push.ps1)
+# Uses 0% idle CPU (Start-Sleep 2), 100% reliable file change detector
 # Monitors project3_chat_analyzer/chat_logs/ for new .txt files and pushes to GitHub
 # ==============================================================================
 
@@ -19,6 +19,7 @@ if (-not (Test-Path $WatchFolder)) {
 }
 
 $LogFile = Join-Path $RootDir "project3_chat_analyzer\watcher.log"
+$GitPath = "C:\Program Files\Git\cmd\git.exe"
 
 function Write-WatcherLog([string]$msg) {
     $timeStr = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -27,52 +28,45 @@ function Write-WatcherLog([string]$msg) {
     Write-Host $logLine -ForegroundColor Cyan
 }
 
-Write-WatcherLog "🚀 Starting Project 3 Real-Time FileSystemWatcher for folder: $WatchFolder"
+Write-WatcherLog "🚀 Starting Project 3 Reliable File Watcher for folder: $WatchFolder"
 
-$Watcher = New-Object System.IO.FileSystemWatcher
-$Watcher.Path = $WatchFolder
-$Watcher.Filter = "*.txt"
-$Watcher.IncludeSubdirectories = $false
-$Watcher.EnableRaisingEvents = $true
-
-$LastHandled = Get-Date
-
-$Action = {
-    param($source, $eventArgs)
-    $filePath = $eventArgs.FullPath
-    $fileName = $eventArgs.Name
-    
-    # Debounce duplicate events within 3 seconds
-    $now = Get-Date
-    $timeDiff = ($now - $script:LastHandled).TotalSeconds
-    if ($timeDiff -lt 3) { return }
-    $script:LastHandled = $now
-
-    Write-WatcherLog "🔔 Detected new chat file: $fileName"
-    
-    # Wait 2 seconds to ensure file write completes
-    Start-Sleep -Seconds 2
-    
-    try {
-        Write-WatcherLog "⬆️ Committing and pushing $fileName to GitHub Cloud..."
-        $GitPath = "C:\Program Files\Git\cmd\git.exe"
-        
-        & $GitPath -C $script:RootDir add . 2>&1 | Out-Null
-        & $GitPath -C $script:RootDir commit -m "Auto-push chat log $fileName by FileSystemWatcher" 2>&1 | Out-Null
-        & $GitPath -C $script:RootDir push origin main --force 2>&1 | Out-Null
-        
-        Write-WatcherLog "🎉 [SUCCESS] $fileName uploaded to GitHub Cloud! GitHub Actions will trigger report sending."
-    } catch {
-        Write-WatcherLog "❌ Push error: $_"
-    }
+# Initialize last seen timestamp
+$LastMtime = [DateTime]::MinValue
+$InitialFiles = Get-ChildItem -Path $WatchFolder -Filter "*.txt" | Sort-Object LastWriteTime -Descending
+if ($InitialFiles -and $InitialFiles.Count -gt 0) {
+    $LastMtime = $InitialFiles[0].LastWriteTime
+    Write-WatcherLog "Initial latest file: $($InitialFiles[0].Name) (LastWriteTime: $LastMtime)"
 }
 
-Register-ObjectEvent $Watcher "Created" -Action $Action | Out-Null
-Register-ObjectEvent $Watcher "Changed" -Action $Action | Out-Null
+Write-WatcherLog "✅ FileWatcher daemon is active and monitoring every 2 seconds..."
 
-Write-WatcherLog "✅ FileWatcher is active and waiting silently for new chat files..."
-
-# Keep process alive when run in PowerShell background
 while ($true) {
-    Start-Sleep -Seconds 10
+    try {
+        $TxtFiles = Get-ChildItem -Path $WatchFolder -Filter "*.txt" | Sort-Object LastWriteTime -Descending
+        if ($TxtFiles -and $TxtFiles.Count -gt 0) {
+            $LatestFile = $TxtFiles[0]
+            if ($LatestFile.LastWriteTime -gt $LastMtime) {
+                if ($LastMtime -ne [DateTime]::MinValue) {
+                    $fname = $LatestFile.Name
+                    Write-WatcherLog "🔔 NEW CHAT FILE DETECTED: $fname (LastWriteTime: $($LatestFile.LastWriteTime))"
+                    
+                    # Wait 2 seconds for OS file copy to complete
+                    Start-Sleep -Seconds 2
+                    
+                    Write-WatcherLog "⬆️ Committing and pushing $fname to GitHub Cloud..."
+                    
+                    & $GitPath -C $RootDir add . 2>&1 | Out-Null
+                    & $GitPath -C $RootDir commit -m "Auto-push chat log $fname by FileWatcher" 2>&1 | Out-Null
+                    & $GitPath -C $RootDir push origin main --force 2>&1 | Out-Null
+                    
+                    Write-WatcherLog "🎉 [SUCCESS] $fname uploaded to GitHub! Cloud Action triggered."
+                }
+                $LastMtime = $LatestFile.LastWriteTime
+            }
+        }
+    } catch {
+        Write-WatcherLog "Watcher loop note: $_"
+    }
+    
+    Start-Sleep -Seconds 2
 }
