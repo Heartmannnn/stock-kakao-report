@@ -5,6 +5,9 @@ on:
     paths:
       - 'project3_chat_analyzer/chat_logs/**'
       - 'chat_logs/**'
+  schedule:
+    # [저녁 정기 스케줄] 매일 저녁 08:00 PM (KST) = UTC 11:00 (가장 최신 파일 자동 읽기)
+    - cron: '0 11 * * *'
   workflow_dispatch: # GitHub 웹 상에서 언제든 수동 버튼으로 실행 가능
 
 permissions:
