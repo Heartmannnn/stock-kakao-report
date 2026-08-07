@@ -9,7 +9,6 @@ def get_env_or_config():
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
     client_secret = os.environ.get("KAKAO_CLIENT_SECRET", "")
 
-    # Fallback to local sp500_config.json if env vars missing
     config_path = os.path.join(os.path.dirname(__file__), "sp500_config.json")
     if os.path.exists(config_path):
         try:
@@ -45,8 +44,7 @@ def refresh_kakao_token(rest_api_key, refresh_token, client_secret=""):
 
 def generate_report(today_str, gemini_api_key=""):
     if gemini_api_key:
-        prompt = f"""You are a professional US stock & S&P500 market analyst. Generate a comprehensive Markdown report in Korean for S&P500 and Big Tech stocks (Nvidia, Microsoft, Apple, Amazon) for date {today_str}.
-Do NOT output placeholders like 'refer to github' or summary notes. Write actual structured data, table, drivers, calendar, and guidance."""
+        prompt = f"""You are a professional US stock & S&P500 market analyst. Generate a comprehensive Markdown report in Korean for S&P500 and Big Tech stocks (Nvidia, Microsoft, Apple, Amazon) for date {today_str}. Do NOT output placeholders."""
         models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"]
         for m in models:
             if gemini_api_key.startswith("AQ."):
@@ -65,7 +63,6 @@ Do NOT output placeholders like 'refer to github' or summary notes. Write actual
             except Exception as e:
                 print(f"Gemini API ({m}) note: {e}")
 
-    # Robust Fallback Report with actual data
     fallback_report = f"""# 📈 [S&P 500 & BigTech 시황 요약 리포트] ({today_str} 기준)
 
 ---
@@ -138,7 +135,7 @@ def format_kakao_message(report_text, report_url, today_str):
         "• 08/12 (수) : 미 소비자물가지수 (CPI)",
         "• 08/13 (목) : 미 생산자물가지수 (PPI)",
         "------------------------------------",
-        f"🔗 S&P500 전체 리포트 보기:\n{report_url}"
+        f"🔗 S&P500 전체 리포트: {report_url}"
     ]
     return "\n".join(lines)
 
@@ -155,7 +152,8 @@ def send_kakao_memo(access_token, message_text, report_url):
     }
     
     headers = {
-        "Authorization": f"Bearer {access_token}"
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
     }
     
     payload = {
@@ -180,7 +178,6 @@ def main():
 
     report_text = generate_report(today_str, gemini_api_key)
     
-    # Save sp500_bigtech_report.md at repository root
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     report_file = os.path.join(repo_root, "sp500_bigtech_report.md")
     with open(report_file, "w", encoding="utf-8") as f:
