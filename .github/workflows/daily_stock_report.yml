@@ -1,13 +1,16 @@
-name: Daily Kakao Stock Report
+name: Daily S&P500 & BigTech Morning Report (Project 2 Cloud Task)
 
 on:
   schedule:
     # 한국시간(KST) 오전 09:00 = UTC 00:00
     - cron: '0 0 * * *'
-  workflow_dispatch: # GitHub 웹 상에서 언제든 수동으로 실행 가능
+  workflow_dispatch: # GitHub 웹 상에서 언제든 수동 버튼으로 실행 가능
+
+permissions:
+  contents: write
 
 jobs:
-  send-report:
+  send-sp500-report:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,9 +22,22 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Run Kakao Report Sender
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      - name: Run S&P500 & BigTech Report Generator & Kakao Sender
         env:
           KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
           KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python send_kakao_report.py
+          python sp500_bigtech_summary/sp500_github_action.py
+
+      - name: Commit and push updated report file
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add sp500_bigtech_report.md
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update S&P500 & BigTech report by GitHub Actions (Cloud)" && git push)
