@@ -4,6 +4,9 @@ sp500_config.json
 **/kakao_config.json
 **/sp500_config.json
 
-# Local chat log exports
-*.txt
-chat_logs/
+# Allow Project 3 chat logs to be tracked by Git
+!project3_chat_analyzer/chat_logs/
+!project3_chat_analyzer/chat_logs/*.txt
+
+# Ignore root temporary text exports if needed
+kakao_chat_analyzer/*.txt
