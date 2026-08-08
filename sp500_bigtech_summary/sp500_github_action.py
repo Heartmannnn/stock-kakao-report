@@ -1,29 +1,41 @@
+# ==============================================================================
+# Project 2: S&P500 & BigTech Morning Report Cloud Task (sp500_github_action.py)
+# Runs 100% headlessly on GitHub Actions Cloud (ubuntu-latest)
+# Features:
+#   1. Automatic Kakao Access Token Refresh using Refresh Token & Secrets
+#   2. Detailed try-except logging for Kakao API & Gemini API calls
+#   3. Generates sp500_bigtech_report.md at repository root
+#   4. Sends KakaoTalk Memo API with web link & button
+# ==============================================================================
+
 import os
 import json
 import datetime
 import requests
 
 def get_env_or_config():
-    rest_api_key = os.environ.get("KAKAO_REST_API_KEY")
-    refresh_token = os.environ.get("KAKAO_REFRESH_TOKEN")
-    gemini_api_key = os.environ.get("GEMINI_API_KEY")
-    client_secret = os.environ.get("KAKAO_CLIENT_SECRET", "")
+    rest_api_key = os.environ.get("KAKAO_REST_API_KEY", "").strip()
+    refresh_token = os.environ.get("KAKAO_REFRESH_TOKEN", "").strip()
+    gemini_api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    client_secret = os.environ.get("KAKAO_CLIENT_SECRET", "").strip()
 
+    # Fallback to local sp500_config.json if running on local desktop PC
     config_path = os.path.join(os.path.dirname(__file__), "sp500_config.json")
     if os.path.exists(config_path):
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
-                if not rest_api_key: rest_api_key = cfg.get("rest_api_key", "")
-                if not refresh_token: refresh_token = cfg.get("refresh_token", "")
-                if not gemini_api_key: gemini_api_key = cfg.get("gemini_api_key", "")
-                if not client_secret: client_secret = cfg.get("client_secret", "")
+                if not rest_api_key: rest_api_key = cfg.get("rest_api_key", "").strip()
+                if not refresh_token: refresh_token = cfg.get("refresh_token", "").strip()
+                if not gemini_api_key: gemini_api_key = cfg.get("gemini_api_key", "").strip()
+                if not client_secret: client_secret = cfg.get("client_secret", "").strip()
         except Exception as e:
             print(f"Config load note: {e}")
 
     return rest_api_key, refresh_token, gemini_api_key, client_secret
 
 def refresh_kakao_token(rest_api_key, refresh_token, client_secret=""):
+    print("🔄 Initiating Kakao Access Token Refresh...")
     url = "https://kauth.kakao.com/oauth/token"
     payload = {
         "grant_type": "refresh_token",
@@ -33,14 +45,23 @@ def refresh_kakao_token(rest_api_key, refresh_token, client_secret=""):
     if client_secret:
         payload["client_secret"] = client_secret
 
-    resp = requests.post(url, data=payload)
-    if resp.status_code == 200:
-        data = resp.json()
-        print("✅ Kakao Access Token refreshed successfully!")
-        return data.get("access_token")
-    else:
-        print(f"❌ Token refresh failed: {resp.status_code} - {resp.text}")
-        return None
+    try:
+        resp = requests.post(url, data=payload, timeout=15)
+        print(f"🔑 Token Refresh Response HTTP Status: {resp.status_code}")
+        if resp.status_code == 200:
+            data = resp.json()
+            token = data.get("access_token")
+            if token:
+                print("✅ Kakao Access Token refreshed successfully!")
+                return token
+            else:
+                print(f"❌ Access Token missing in refresh response: {resp.text}")
+        else:
+            print(f"❌ Kakao Token refresh failed! HTTP {resp.status_code}: {resp.text}")
+    except Exception as e:
+        print(f"❌ Exception during Kakao Token refresh: {e}")
+
+    return None
 
 def generate_report(today_str, gemini_api_key=""):
     if gemini_api_key:
@@ -55,14 +76,16 @@ def generate_report(today_str, gemini_api_key=""):
                 headers = {}
             body = {"contents": [{"parts": [{"text": prompt}]}]}
             try:
-                r = requests.post(g_url, headers=headers, json=body, timeout=10)
+                r = requests.post(g_url, headers=headers, json=body, timeout=12)
                 if r.status_code == 200:
                     text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
                     if text.strip() and "주요 지수" in text:
+                        print(f"✅ Successfully generated report using Gemini API model: {m}")
                         return text
             except Exception as e:
                 print(f"Gemini API ({m}) note: {e}")
 
+    print("ℹ️ Using robust fallback S&P500 report.")
     fallback_report = f"""# 📈 [S&P 500 & BigTech 시황 요약 리포트] ({today_str} 기준)
 
 ---
@@ -160,38 +183,52 @@ def send_kakao_memo(access_token, message_text, report_url):
         "template_object": json.dumps(template_obj, ensure_ascii=False)
     }
     
-    resp = requests.post(url, headers=headers, data=payload)
-    return resp
+    try:
+        resp = requests.post(url, headers=headers, data=payload, timeout=15)
+        print(f"✉️ KakaoMemo Send HTTP Status Code: {resp.status_code}")
+        print(f"📩 KakaoMemo API Response Body: {resp.text}")
+        return resp
+    except Exception as e:
+        print(f"❌ Exception sending Kakao Memo: {e}")
+        return None
 
 def main():
+    print(f"🚀 Starting Project 2 S&P500 Cloud Task Execution ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     rest_api_key, refresh_token, gemini_api_key, client_secret = get_env_or_config()
     
     if not rest_api_key or not refresh_token:
-        print("❌ KAKAO_REST_API_KEY or KAKAO_REFRESH_TOKEN missing.")
-        return
+        print("❌ CRITICAL ERROR: KAKAO_REST_API_KEY or KAKAO_REFRESH_TOKEN is missing!")
+        print("Please ensure Secrets are registered in GitHub Repository Settings -> Secrets and variables -> Actions.")
+        raise ValueError("Missing required Kakao API credentials in environment/secrets.")
 
     access_token = refresh_kakao_token(rest_api_key, refresh_token, client_secret)
     if not access_token:
-        print("❌ Could not get valid Access Token.")
-        return
+        print("❌ CRITICAL ERROR: Could not obtain valid Access Token from Kakao Refresh API.")
+        raise RuntimeError("Kakao Token Refresh failed.")
 
     report_text = generate_report(today_str, gemini_api_key)
     
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     report_file = os.path.join(repo_root, "sp500_bigtech_report.md")
+    
+    clean_markdown = report_text.replace("\r\n", "\n").replace("\n", "\r\n")
     with open(report_file, "w", encoding="utf-8") as f:
-        f.write(report_text)
-    print(f"📄 Saved report to {report_file}")
+        f.write(clean_markdown)
+    print(f"📄 Successfully saved report to: {report_file}")
 
     report_url = "https://github.com/Heartmannnn/stock-kakao-report/blob/main/sp500_bigtech_report.md"
     msg_text = format_kakao_message(report_text, report_url, today_str)
 
     resp = send_kakao_memo(access_token, msg_text, report_url)
-    if resp.status_code == 200 and resp.json().get("result_code") == 0:
-        print("🎉 [SUCCESS] GitHub Action sent S&P500 Morning Report to KakaoTalk with direct Link & Button!")
+    if resp and resp.status_code == 200 and resp.json().get("result_code") == 0:
+        print("🎉 [SUCCESS] Project 2 GitHub Action sent S&P500 Morning Report to KakaoTalk with direct Link & Button!")
     else:
-        print(f"❌ Send failed: {resp.status_code} - {resp.text}")
+        print("❌ [FAILURE] KakaoTalk message sending failed!")
+        if resp:
+            raise RuntimeError(f"Kakao API Error Code {resp.status_code}: {resp.text}")
+        else:
+            raise RuntimeError("Kakao API call threw an exception.")
 
 if __name__ == "__main__":
     main()
