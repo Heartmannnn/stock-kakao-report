@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Project 2: S&P500 & Big Tech AI Analysis Generator (analyze_sp500_bigtech.ps1)
 # Saves both local daily report and dedicated root report for GitHub direct link
 # ==============================================================================
@@ -41,12 +41,7 @@ $MarkdownReport = ""
 if (-not [string]::IsNullOrWhiteSpace($GeminiApiKey)) {
     foreach ($model in $ModelsToTry) {
         $Headers = @{}
-        if ($GeminiApiKey.StartsWith("AQ.")) {
-            $GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent"
-            $Headers["Authorization"] = "Bearer $GeminiApiKey"
-        } else {
-            $GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=$GeminiApiKey"
-        }
+        $GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=$GeminiApiKey"
 
         $PayloadObj = @{
             contents = @(

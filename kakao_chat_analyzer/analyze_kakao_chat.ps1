@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Project 1: KakaoTalk Chat Stock Analysis & Memo Sender
 # Target Room: "전자오락 중독말기 환자 병동"
 # Focus: 
@@ -221,12 +221,7 @@ $MarkdownReport = ""
 
 foreach ($model in $ModelsToTry) {
     $Headers = @{}
-    if ($GeminiApiKey.StartsWith("AQ.")) {
-        $GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent"
-        $Headers["Authorization"] = "Bearer $GeminiApiKey"
-    } else {
-        $GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=$GeminiApiKey"
-    }
+    $GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=$GeminiApiKey"
 
     $PayloadObj = @{
         contents = @(
