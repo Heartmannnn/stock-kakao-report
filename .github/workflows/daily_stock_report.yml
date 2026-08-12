@@ -2,8 +2,9 @@ name: Daily S&P500 & BigTech Morning Report (Project 2 Cloud Task)
 
 on:
   schedule:
-    # [정기 스케줄] 매일 한국시간(KST) 오전 09:00 정기 발송 = UTC 00:00
-    - cron: '0 0 * * *'
+    # [오프피크 정기 스케줄] 매일 아침 08:50 KST 정각 완료 = UTC 23:50 (전날)
+    # 00:00 UTC 깃허브 서버 큐 대기 정체를 방지하기 위해 23:50 UTC(08:50 AM KST)에 실행하여 9시 정각 전 발송 완료
+    - cron: '50 23 * * *'
   workflow_dispatch: # GitHub 웹 상에서 언제든 수동 버튼으로 실행 가능
 
 permissions:
