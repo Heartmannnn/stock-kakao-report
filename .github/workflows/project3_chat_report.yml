@@ -1,10 +1,10 @@
 name: Project 3 Manual Chat Log AI Analyzer (Cloud Task)
 
 on:
-  push:
-    paths:
-      - 'project3_chat_analyzer/chat_logs/**'
-      - 'chat_logs/**'
+  # push:
+  #   paths:
+  #     - 'project3_chat_analyzer/chat_logs/**'
+  #     - 'chat_logs/**'
   workflow_dispatch: # GitHub 웹 상에서 언제든 수동 버튼으로 실행 가능
 
 permissions:
